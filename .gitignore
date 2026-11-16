@@ -5,3 +5,6 @@
 /internal/agentbin/bin/droidfs-agent-*
 
 .DS_Store
+
+# SwiftPM build output of the app
+/gui/.build/

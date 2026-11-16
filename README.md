@@ -41,9 +41,44 @@ The daemon waits for devices and mounts each one at `~/DroidFS/<model>`.
 | `-keep-ptpcamerad` | off | MTP: do not kill the system `ptpcamerad`, even if it holds the device |
 | `-open` | off | open the volume in Finder after mounting |
 | `-trace` | off | log every NFS request |
+| `-control <socket>` | none | serve status and commands on a Unix socket (see below) |
+| `-stdin-lifeline` | off | shut down cleanly when stdin closes |
 
 `droidfs devices` lists the devices seen over adb and MTP. `droidfs unmount`
 force-unmounts all droidfs volumes (cleanup after a crash).
+
+## The DroidFS app
+
+`make app` (needs Xcode) builds `bin/DroidFS.app`, a SwiftUI app around the
+same daemon:
+
+- a window with the devices, their state and volume actions (open in Finder,
+  eject, mount again), and the daemon's log;
+- a menu bar icon with the same devices and actions;
+- settings: launch at login, show the menu bar icon, show the Dock icon. The
+  Dock icon can be hidden only while the menu bar icon is shown; with it
+  hidden, the app starts in the menu bar without opening its window.
+
+The app runs the daemon from its bundle (as `droidfsd`) with `-control` and
+`-stdin-lifeline`, so the daemon exits with the app, even if the app crashes.
+Quitting the app unmounts every volume. Only one daemon runs at a time: stop a
+`droidfs` started from the terminal before opening the app.
+
+The bundle is signed ad hoc, for the Mac it was built on.
+
+### Control API
+
+With `-control <socket>` the daemon answers HTTP/JSON on that Unix socket
+(mode 0600, so only its user can reach it):
+
+| Request | Answer |
+|---|---|
+| `GET /v1/devices` | every device seen since start: `id`, `transport`, `model`, `serial`, `point`, `state` (`mounted`, `offline`, `connecting`, `ejected`, `disconnected`), `error` |
+| `POST /v1/devices/{id}/eject` | 204; unmounts the volume and keeps it unmounted until `mount` or a re-plug |
+| `POST /v1/devices/{id}/mount` | 204; mounts an ejected volume again |
+
+Both commands return before the work is done; poll `GET /v1/devices` for the
+outcome. An unknown `id` gives 404.
 
 ## How it works
 
@@ -123,7 +158,10 @@ other copying method.
 - The NFS server listens only on `127.0.0.1`; the root handle is given only to
   the user who started the daemon, but this is not full protection against
   other local users.
-- CLI only: no menu bar icon and no autostart.
+- The app is signed ad hoc and not notarized, so it runs on the Mac that built
+  it. Its interface is in English only; the strings go through a String
+  Catalog (`gui/Resources/Localizable.xcstrings`), so translations can be
+  added.
 
 ## Tests
 

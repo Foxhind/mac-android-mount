@@ -7,6 +7,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -14,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"droidfs/internal/control"
 	"droidfs/internal/manager"
 )
 
@@ -33,6 +35,8 @@ Flags:
 func main() {
 	home, _ := os.UserHomeDir()
 	var cfg manager.Config
+	var controlPath string
+	var stdinLifeline bool
 	flag.StringVar(&cfg.Mode, "mode", "auto", "transport: adb, mtp, or auto (adb when the device offers it, else mtp)")
 	flag.StringVar(&cfg.Serial, "s", "", "only mount the device with this serial")
 	flag.StringVar(&cfg.Root, "root", "/sdcard", "directory on the device to mount (adb only)")
@@ -43,6 +47,8 @@ func main() {
 	flag.BoolVar(&cfg.KeepPTPCamerad, "keep-ptpcamerad", false, "MTP: do not stop macOS's camera helper when it holds the device")
 	flag.BoolVar(&cfg.Open, "open", false, "open each volume in Finder when it is mounted")
 	flag.BoolVar(&cfg.Trace, "trace", false, "log every NFS request")
+	flag.StringVar(&controlPath, "control", "", "serve status and commands on this Unix socket (used by the DroidFS app)")
+	flag.BoolVar(&stdinLifeline, "stdin-lifeline", false, "shut down cleanly when stdin is closed, e.g. because the parent app exited")
 	flag.Usage = usage
 	flag.Parse()
 	cfg.Log = log.New(os.Stderr, "", log.Ltime)
@@ -103,7 +109,27 @@ func main() {
 		os.Exit(1)
 	}()
 
-	if err := manager.New(cfg).Run(ctx); err != nil {
+	if stdinLifeline {
+		go func() {
+			io.Copy(io.Discard, os.Stdin) // returns at EOF: the parent is gone
+			cfg.Log.Printf("stdin closed; shutting down")
+			cancel()
+		}()
+	}
+
+	mgr := manager.New(cfg)
+	if controlPath != "" {
+		ln, err := control.Listen(controlPath)
+		if err != nil {
+			cfg.Log.Fatal(err)
+		}
+		go func() {
+			if err := control.Serve(ctx, ln, mgr); err != nil {
+				cfg.Log.Printf("%v", err)
+			}
+		}()
+	}
+	if err := mgr.Run(ctx); err != nil {
 		cfg.Log.Fatal(err)
 	}
 }

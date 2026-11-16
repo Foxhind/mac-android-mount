@@ -12,11 +12,13 @@ package manager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -314,20 +316,29 @@ type backend interface {
 }
 
 type unit struct {
-	m      *Manager
-	serial string
-	name   string
-	point  string
-	log    *log.Logger
+	m         *Manager
+	key       string // "adb:<serial>" / "mtp:<id>"
+	transport string // "adb" or "mtp"
+	model     string
+	serial    string
+	name      string
+	point     string
+	log       *log.Logger
 
 	be     backend
 	usbDev mtp.USBDevice // MTP units: where the device currently sits
 	fs     *vfs.FS
 	srv    *nfs.Server
 
-	mu      sync.Mutex
-	present bool
-	arrived bool // set on every absent -> present transition
+	mu       sync.Mutex
+	present  bool
+	arrived  bool // set on every absent -> present transition
+	ejectReq bool // the user asked to unmount
+	mountReq bool // the user asked to mount again after an eject
+	// What run last published, for Status.
+	mounted bool
+	ejected bool
+	lastErr string
 	wake    chan struct{}
 	stop    chan struct{}
 	done    chan struct{}
@@ -357,16 +368,20 @@ func (m *Manager) startUnitLocked(key, model, id string, be backend) *unit {
 			point = filepath.Join(m.cfg.MountDir, name+" "+sanitize(id))
 		}
 	}
+	transport, _, _ := strings.Cut(key, ":")
 	u := &unit{
-		m:      m,
-		serial: id,
-		name:   sanitize(strings.ReplaceAll(key, ":", "-")),
-		point:  point,
-		log:    log.New(m.cfg.Log.Writer(), m.cfg.Log.Prefix()+"["+name+"] ", m.cfg.Log.Flags()),
-		be:     be,
-		wake:   make(chan struct{}, 1),
-		stop:   make(chan struct{}),
-		done:   make(chan struct{}),
+		m:         m,
+		key:       key,
+		transport: transport,
+		model:     model,
+		serial:    id,
+		name:      sanitize(strings.ReplaceAll(key, ":", "-")),
+		point:     point,
+		log:       log.New(m.cfg.Log.Writer(), m.cfg.Log.Prefix()+"["+name+"] ", m.cfg.Log.Flags()),
+		be:        be,
+		wake:      make(chan struct{}, 1),
+		stop:      make(chan struct{}),
+		done:      make(chan struct{}),
 	}
 	m.units[key] = u
 	if be != nil {
@@ -384,11 +399,23 @@ func (u *unit) setPresent(p bool) {
 	u.present = p
 	u.mu.Unlock()
 	if changed {
-		select {
-		case u.wake <- struct{}{}:
-		default:
-		}
+		u.poke()
 	}
+}
+
+// poke wakes run without blocking.
+func (u *unit) poke() {
+	select {
+	case u.wake <- struct{}{}:
+	default:
+	}
+}
+
+// publish records run's view of the unit for Status.
+func (u *unit) publish(mounted, ejected bool, lastErr string) {
+	u.mu.Lock()
+	u.mounted, u.ejected, u.lastErr = mounted, ejected, lastErr
+	u.mu.Unlock()
 }
 
 func (u *unit) run() {
@@ -447,12 +474,28 @@ func (u *unit) run() {
 	for {
 		u.mu.Lock()
 		present, arrived := u.present, u.arrived
-		u.arrived = false
+		ejectReq, mountReq := u.ejectReq, u.mountReq
+		u.arrived, u.ejectReq, u.mountReq = false, false, false
 		u.mu.Unlock()
 		now := time.Now()
-		if arrived {
+		if arrived || mountReq {
 			ejected = false
 			nextTry, backoff = time.Time{}, 500*time.Millisecond
+		}
+		if ejectReq && !ejected {
+			// Like ejecting in Finder: a busy volume stays mounted.
+			if mounted {
+				if err := mount.Unmount(u.point, false); err != nil {
+					u.log.Printf("eject failed: %v", err)
+					lastErr = "eject failed: " + err.Error()
+				} else {
+					u.log.Printf("ejected %s; it stays unmounted until you mount it again or re-plug the device", u.point)
+					os.Remove(u.point)
+					mounted, ejected, lastErr = false, true, ""
+				}
+			} else {
+				ejected = true
+			}
 		}
 
 		online := u.be.Online()
@@ -499,9 +542,10 @@ func (u *unit) run() {
 				})
 				if err != nil {
 					u.log.Printf("%v", err)
+					lastErr = err.Error()
 					nextTry = time.Now().Add(3 * time.Second)
 				} else {
-					mounted = true
+					mounted, lastErr = true, ""
 					u.log.Printf("mounted at %s", u.point)
 					if cfg.Open {
 						exec.Command("/usr/bin/open", u.point).Start()
@@ -519,6 +563,8 @@ func (u *unit) run() {
 				unmount(true, "device gone")
 			}
 		}
+
+		u.publish(mounted, ejected, lastErr)
 
 		// Sleep until something can change.
 		wait := 2 * time.Second // periodic check for user-initiated unmounts
@@ -549,6 +595,96 @@ func (u *unit) run() {
 		}
 		t.Stop()
 	}
+}
+
+// State is where a device stands, as shown to the user.
+type State string
+
+// The states a device can be in.
+const (
+	StateMounted      State = "mounted"      // online and mounted
+	StateOffline      State = "offline"      // link lost; the mount is kept for the grace period
+	StateConnecting   State = "connecting"   // present, not mounted yet
+	StateEjected      State = "ejected"      // unmounted by the user; stays so until Mount or a re-plug
+	StateDisconnected State = "disconnected" // not attached
+)
+
+// DeviceStatus describes one device the daemon has seen since it started.
+type DeviceStatus struct {
+	ID        string // stable key for Eject and Mount
+	Transport string // "adb" or "mtp"
+	Model     string
+	Serial    string
+	Point     string // mount point, also while unmounted
+	State     State
+	Error     string // last connect, mount or eject failure, if any
+}
+
+// ErrUnknownDevice is returned for an ID that Status never listed.
+var ErrUnknownDevice = errors.New("unknown device")
+
+// Status lists every device seen since the daemon started, sorted by ID.
+func (m *Manager) Status() []DeviceStatus {
+	m.mu.Lock()
+	units := make([]*unit, 0, len(m.units))
+	for _, u := range m.units {
+		units = append(units, u)
+	}
+	m.mu.Unlock()
+	out := make([]DeviceStatus, 0, len(units))
+	for _, u := range units {
+		out = append(out, u.status())
+	}
+	slices.SortFunc(out, func(a, b DeviceStatus) int { return strings.Compare(a.ID, b.ID) })
+	return out
+}
+
+func (u *unit) status() DeviceStatus {
+	online := u.be != nil && u.be.Online()
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	st := StateDisconnected
+	switch {
+	case u.mounted && online:
+		st = StateMounted
+	case u.mounted:
+		st = StateOffline
+	case u.ejected:
+		st = StateEjected
+	case u.present:
+		st = StateConnecting
+	}
+	return DeviceStatus{
+		ID: u.key, Transport: u.transport, Model: u.model, Serial: u.serial,
+		Point: u.point, State: st, Error: u.lastErr,
+	}
+}
+
+// Eject unmounts a device's volume, as ejecting it in Finder would; it is
+// not mounted again until Mount is called or the device is re-plugged. It
+// returns before the unmount is done: Status shows the outcome.
+func (m *Manager) Eject(id string) error {
+	return m.request(id, func(u *unit) { u.ejectReq = true })
+}
+
+// Mount mounts an ejected device's volume again. Like Eject, it returns
+// before the work is done.
+func (m *Manager) Mount(id string) error {
+	return m.request(id, func(u *unit) { u.mountReq = true })
+}
+
+func (m *Manager) request(id string, set func(*unit)) error {
+	m.mu.Lock()
+	u := m.units[id]
+	m.mu.Unlock()
+	if u == nil {
+		return fmt.Errorf("%w: %s", ErrUnknownDevice, id)
+	}
+	u.mu.Lock()
+	set(u)
+	u.mu.Unlock()
+	u.poke()
+	return nil
 }
 
 // Devices lists what adb currently sees.

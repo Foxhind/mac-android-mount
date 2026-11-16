@@ -2,9 +2,12 @@ package e2e
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"droidfs/internal/control"
 	"droidfs/internal/mount"
 )
 
@@ -174,10 +178,40 @@ func TestDaemon(t *testing.T) {
 	defer ln.Close()
 
 	point := filepath.Join(dir, "Pixel Test")
+	sock := filepath.Join(tmp, "control.sock")
+	ctl := &http.Client{Transport: &http.Transport{
+		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			var d net.Dialer
+			return d.DialContext(ctx, "unix", sock)
+		},
+	}}
+	state := func() string {
+		resp, err := ctl.Get("http://droidfs/v1/devices")
+		if err != nil {
+			return "unreachable: " + err.Error()
+		}
+		defer resp.Body.Close()
+		var list []control.Device
+		if err := json.NewDecoder(resp.Body).Decode(&list); err != nil || len(list) != 1 {
+			return fmt.Sprintf("bad list %+v %v", list, err)
+		}
+		return list[0].State
+	}
+	post := func(cmd string) {
+		t.Helper()
+		resp, err := ctl.Post("http://droidfs/v1/devices/adb:"+fakeSerial+"/"+cmd, "", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("%s: status %d", cmd, resp.StatusCode)
+		}
+	}
 	var logs bytes.Buffer
 	var logMu sync.Mutex
 	start := func() *exec.Cmd {
-		cmd := exec.Command(bin, "-dir", dir, "-root", dev, "-grace", "4s")
+		cmd := exec.Command(bin, "-dir", dir, "-root", dev, "-grace", "4s", "-control", sock)
 		cmd.Env = append(os.Environ(),
 			"ANDROID_ADB_SERVER_PORT="+strconv.Itoa(ln.Addr().(*net.TCPAddr).Port),
 			"HOME="+tmp) // private lock file: do not collide with a real daemon
@@ -222,6 +256,21 @@ func TestDaemon(t *testing.T) {
 	if b, _ := os.ReadFile(filepath.Join(dev, "note.txt")); string(b) != "kept" {
 		t.Fatalf("device has %q", b)
 	}
+
+	// --- the app ejects the volume, then mounts it again
+	waitFor(t, 5*time.Second, "control API reports mounted", func() bool { return state() == "mounted" })
+	post("eject")
+	waitFor(t, 10*time.Second, "ejected through the control API", func() bool {
+		return !mounted() && state() == "ejected"
+	})
+	time.Sleep(3 * time.Second) // longer than the unit's 2 s check: it must not remount by itself
+	if mounted() {
+		t.Fatal("ejected volume was mounted again without being asked")
+	}
+	post("mount")
+	waitFor(t, 15*time.Second, "mounted again through the control API", func() bool {
+		return mounted() && state() == "mounted"
+	})
 
 	// --- cable pulled, plugged back within the grace period
 	os.WriteFile(filepath.Join(dev, "uncached-1"), []byte("1"), 0o644)

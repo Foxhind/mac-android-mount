@@ -4,7 +4,7 @@ AGENT_DIR := internal/agentbin/bin
 LDFLAGS   := -s -w
 ARCHS     := arm arm64 386 amd64
 
-.PHONY: all agents build build-nomtp test clean
+.PHONY: all agents build build-nomtp app test clean
 
 all: build
 
@@ -23,9 +23,24 @@ build: agents
 build-nomtp: agents
 	CGO_ENABLED=0 go build -tags nomtp -trimpath -ldflags '$(LDFLAGS)' -o bin/droidfs ./cmd/droidfs
 
+# The DroidFS app (SwiftUI) with the daemon inside: bin/DroidFS.app.
+# Needs Xcode. The bundle is signed ad hoc, for this Mac only. The daemon is
+# renamed droidfsd inside it: APFS is case-insensitive, and "droidfs" would
+# overwrite the app's own "DroidFS" executable.
+app: build
+	cd gui && swift build -c release
+	rm -rf bin/DroidFS.app
+	mkdir -p bin/DroidFS.app/Contents/MacOS bin/DroidFS.app/Contents/Resources
+	cp gui/Resources/Info.plist bin/DroidFS.app/Contents/
+	cp "$$(cd gui && swift build -c release --show-bin-path)/DroidFS" bin/DroidFS.app/Contents/MacOS/
+	cp bin/droidfs bin/DroidFS.app/Contents/MacOS/droidfsd
+	xcrun xcstringstool compile gui/Resources/Localizable.xcstrings --output-directory bin/DroidFS.app/Contents/Resources
+	codesign --force --sign - bin/DroidFS.app/Contents/MacOS/droidfsd
+	codesign --force --sign - bin/DroidFS.app
+
 test: agents
 	go vet ./...
 	go test ./...
 
 clean:
-	rm -rf bin $(AGENT_DIR)/droidfs-agent-*
+	rm -rf bin gui/.build $(AGENT_DIR)/droidfs-agent-*

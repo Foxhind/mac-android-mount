@@ -24,6 +24,7 @@ type Options struct {
 	ListTimeout time.Duration // directory listing (can be huge)
 }
 
+// DefaultOptions returns the timeouts used in production.
 func DefaultOptions() Options {
 	return Options{
 		LinkTimeout: 6 * time.Second,
@@ -52,6 +53,8 @@ type Backend struct {
 	epoch atomic.Uint64
 }
 
+// NewBackend returns a disconnected backend that exports root on the device
+// and reaches it through dial.
 func NewBackend(dial DialFunc, root string, opt Options) *Backend {
 	return &Backend{dial: dial, rootReq: root, opt: opt}
 }
@@ -142,6 +145,7 @@ func (b *Backend) Down() <-chan struct{} {
 	return b.cur.down
 }
 
+// Online reports whether the backend currently has a live connection.
 func (b *Backend) Online() bool {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
@@ -196,6 +200,7 @@ func attrResult(d proto.Dec, err error) (proto.Attr, error) {
 	return a, d.Err
 }
 
+// Stat implements vfs.Backend.
 func (b *Backend) Stat(rel string) (proto.Attr, error) {
 	c, err := b.conn()
 	if err != nil {
@@ -206,6 +211,7 @@ func (b *Backend) Stat(rel string) (proto.Attr, error) {
 	return attrResult(call(c.meta, b.opt.MetaTimeout, proto.OpStat, e.B))
 }
 
+// ReadDir implements vfs.Backend.
 func (b *Backend) ReadDir(rel string) ([]proto.DirEnt, error) {
 	c, err := b.conn()
 	if err != nil {
@@ -230,6 +236,7 @@ func (b *Backend) ReadDir(rel string) ([]proto.DirEnt, error) {
 	return ents, d.Err
 }
 
+// Read implements vfs.Backend.
 func (b *Backend) Read(rel string, off uint64, n uint32) ([]byte, bool, proto.Attr, error) {
 	c, err := b.conn()
 	if err != nil {
@@ -268,6 +275,7 @@ func (b *Backend) Write(rel string, off uint64, data []byte) (pre, post proto.At
 	return pre, post, d.Err
 }
 
+// Create implements vfs.Backend.
 func (b *Backend) Create(rel string, mode uint32, excl, trunc bool) (proto.Attr, error) {
 	c, err := b.conn()
 	if err != nil {
@@ -281,6 +289,7 @@ func (b *Backend) Create(rel string, mode uint32, excl, trunc bool) (proto.Attr,
 	return attrResult(call(c.meta, b.opt.MetaTimeout, proto.OpCreate, e.B))
 }
 
+// Mkdir implements vfs.Backend.
 func (b *Backend) Mkdir(rel string, mode uint32) (proto.Attr, error) {
 	c, err := b.conn()
 	if err != nil {
@@ -306,26 +315,31 @@ func (b *Backend) simple(op byte, timeout time.Duration, rel string, extra func(
 	return err
 }
 
+// Remove implements vfs.Backend.
 func (b *Backend) Remove(rel string) error {
 	return b.simple(proto.OpRemove, b.opt.MetaTimeout, rel, nil)
 }
 
+// Rmdir implements vfs.Backend.
 func (b *Backend) Rmdir(rel string) error {
 	return b.simple(proto.OpRmdir, b.opt.MetaTimeout, rel, nil)
 }
 
+// Rename implements vfs.Backend.
 func (b *Backend) Rename(from, to string) error {
 	return b.simple(proto.OpRename, b.opt.MetaTimeout, from, func(c *conn, e *proto.Enc) {
 		e.Str(c.abs(to))
 	})
 }
 
+// Truncate implements vfs.Backend.
 func (b *Backend) Truncate(rel string, size uint64) error {
 	return b.simple(proto.OpTruncate, b.opt.MetaTimeout, rel, func(_ *conn, e *proto.Enc) {
 		e.U64(size)
 	})
 }
 
+// Utimes implements vfs.Backend.
 func (b *Backend) Utimes(rel string, sec int64, nsec uint32) error {
 	return b.simple(proto.OpUtimes, b.opt.MetaTimeout, rel, func(_ *conn, e *proto.Enc) {
 		e.U64(uint64(sec))
@@ -333,10 +347,12 @@ func (b *Backend) Utimes(rel string, sec int64, nsec uint32) error {
 	})
 }
 
+// Fsync implements vfs.Backend.
 func (b *Backend) Fsync(rel string) error {
 	return b.simple(proto.OpFsync, b.opt.SyncTimeout, rel, nil)
 }
 
+// Statfs implements vfs.Backend.
 func (b *Backend) Statfs() (proto.Statfs, error) {
 	c, err := b.conn()
 	if err != nil {
@@ -352,6 +368,7 @@ func (b *Backend) Statfs() (proto.Statfs, error) {
 	return s, d.Err
 }
 
+// Symlink implements vfs.Backend.
 func (b *Backend) Symlink(target, rel string) (proto.Attr, error) {
 	c, err := b.conn()
 	if err != nil {
@@ -363,6 +380,7 @@ func (b *Backend) Symlink(target, rel string) (proto.Attr, error) {
 	return attrResult(call(c.meta, b.opt.MetaTimeout, proto.OpSymlink, e.B))
 }
 
+// Readlink implements vfs.Backend.
 func (b *Backend) Readlink(rel string) (string, error) {
 	c, err := b.conn()
 	if err != nil {

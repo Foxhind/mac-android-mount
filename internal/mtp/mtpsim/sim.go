@@ -72,6 +72,7 @@ type link struct {
 	once   sync.Once
 }
 
+// New returns a simulated device serving root, already plugged in.
 func New(root string) *Device {
 	d := &Device{Root: root}
 	d.Replug()

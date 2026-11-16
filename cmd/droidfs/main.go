@@ -1,5 +1,6 @@
-// droidfs mounts the storage of Android devices as ordinary folders on
-// macOS, over adb, and keeps the Mac responsive when a device goes away.
+// Command droidfs mounts the storage of Android devices as ordinary folders
+// on macOS, over adb or MTP, and keeps the Mac responsive when a device goes
+// away.
 package main
 
 import (
@@ -17,11 +18,11 @@ import (
 )
 
 func usage() {
-	fmt.Fprintf(os.Stderr, `droidfs - mount Android devices as folders (over adb)
+	fmt.Fprintf(os.Stderr, `droidfs - mount Android devices as folders (over adb or MTP)
 
 Usage:
   droidfs [flags]      mount every connected device and keep watching
-  droidfs devices      list the devices adb can see
+  droidfs devices      list the devices seen over adb and MTP
   droidfs unmount      force-unmount all droidfs volumes (cleanup)
 
 Flags:
@@ -67,6 +68,10 @@ func main() {
 		}
 		if len(devs)+len(mtps) == 0 {
 			fmt.Println("no devices")
+		}
+		if err != nil {
+			cancel()
+			os.Exit(1) // the adb list may be incomplete
 		}
 		return
 	case "unmount":

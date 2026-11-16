@@ -78,6 +78,7 @@ const (
 	ErrJukebox     Status = 10008
 )
 
+// Error implements error.
 func (s Status) Error() string {
 	switch s {
 	case OK:
@@ -146,10 +147,16 @@ type Attr struct {
 // AttrLen is the encoded size of an Attr.
 const AttrLen = 44
 
+// IsDir reports whether a describes a directory.
 func (a Attr) IsDir() bool { return a.Mode&ModeFmt == ModeDir }
+
+// IsReg reports whether a describes a regular file.
 func (a Attr) IsReg() bool { return a.Mode&ModeFmt == ModeReg }
+
+// IsLnk reports whether a describes a symbolic link.
 func (a Attr) IsLnk() bool { return a.Mode&ModeFmt == ModeLnk }
 
+// Attr appends a in its AttrLen-byte wire form.
 func (e *Enc) Attr(a Attr) {
 	e.U32(a.Mode)
 	e.U32(a.Nlink)
@@ -160,6 +167,7 @@ func (e *Enc) Attr(a Attr) {
 	e.U64(a.Ino)
 }
 
+// Attr decodes an Attr written by Enc.Attr.
 func (d *Dec) Attr() Attr {
 	var a Attr
 	a.Mode = d.U32()
@@ -192,11 +200,19 @@ type Hello struct {
 
 // ---------------------------------------------------------------- encoding
 
+// Enc appends big-endian values to B.
 type Enc struct{ B []byte }
 
-func (e *Enc) U8(v byte)    { e.B = append(e.B, v) }
+// U8 appends one byte.
+func (e *Enc) U8(v byte) { e.B = append(e.B, v) }
+
+// U32 appends a 32-bit integer.
 func (e *Enc) U32(v uint32) { e.B = binary.BigEndian.AppendUint32(e.B, v) }
+
+// U64 appends a 64-bit integer.
 func (e *Enc) U64(v uint64) { e.B = binary.BigEndian.AppendUint64(e.B, v) }
+
+// Bool appends v as one byte.
 func (e *Enc) Bool(v bool) {
 	if v {
 		e.U8(1)
@@ -204,6 +220,8 @@ func (e *Enc) Bool(v bool) {
 		e.U8(0)
 	}
 }
+
+// Str appends s with a 32-bit length prefix.
 func (e *Enc) Str(s string) {
 	e.U32(uint32(len(s)))
 	e.B = append(e.B, s...)
@@ -212,8 +230,11 @@ func (e *Enc) Str(s string) {
 // Raw appends bytes without a length prefix (must be the last field).
 func (e *Enc) Raw(b []byte) { e.B = append(e.B, b...) }
 
+// ErrShort is set on a Dec that ran out of input.
 var ErrShort = errors.New("proto: truncated message")
 
+// Dec consumes values written by Enc from B. The first failure is kept in
+// Err and every later read returns a zero value.
 type Dec struct {
 	B   []byte
 	Err error
@@ -229,25 +250,34 @@ func (d *Dec) take(n int) []byte {
 	return b
 }
 
+// U8 reads one byte.
 func (d *Dec) U8() byte {
 	if b := d.take(1); b != nil {
 		return b[0]
 	}
 	return 0
 }
+
+// Bool reads a value written by Enc.Bool.
 func (d *Dec) Bool() bool { return d.U8() != 0 }
+
+// U32 reads a 32-bit integer.
 func (d *Dec) U32() uint32 {
 	if b := d.take(4); b != nil {
 		return binary.BigEndian.Uint32(b)
 	}
 	return 0
 }
+
+// U64 reads a 64-bit integer.
 func (d *Dec) U64() uint64 {
 	if b := d.take(8); b != nil {
 		return binary.BigEndian.Uint64(b)
 	}
 	return 0
 }
+
+// Str reads a length-prefixed string.
 func (d *Dec) Str() string {
 	n := d.U32()
 	if d.Err != nil || n > uint32(len(d.B)) {
@@ -279,6 +309,7 @@ func AppendRequest(dst []byte, id uint32, op byte, payload []byte) []byte {
 	return append(dst, payload...)
 }
 
+// ReadRequest reads one request frame built by AppendRequest.
 func ReadRequest(r io.Reader) (id uint32, op byte, payload []byte, err error) {
 	var h [9]byte
 	if _, err = io.ReadFull(r, h[:]); err != nil {
@@ -305,6 +336,7 @@ func ResponseHeader(id uint32, st Status, payloadLen int) [hdrLen]byte {
 	return h
 }
 
+// ReadResponse reads one response frame: a ResponseHeader and its payload.
 func ReadResponse(r io.Reader) (id uint32, st Status, payload []byte, err error) {
 	var h [hdrLen]byte
 	if _, err = io.ReadFull(r, h[:]); err != nil {

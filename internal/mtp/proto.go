@@ -90,6 +90,7 @@ const (
 // RespError is a failure reported by the device.
 type RespError uint16
 
+// Error implements error.
 func (e RespError) Error() string { return fmt.Sprintf("mtp: device answered 0x%04X", uint16(e)) }
 
 var errMalformed = errors.New("mtp: malformed data from device")
@@ -209,6 +210,7 @@ func (d *dec) u32s() []uint32 {
 
 // --------------------------------------------------------------- datasets
 
+// DeviceInfo is the part of the MTP DeviceInfo dataset that droidfs uses.
 type DeviceInfo struct {
 	VendorExtension string
 	Operations      []uint16
@@ -219,6 +221,7 @@ type DeviceInfo struct {
 	Serial          string
 }
 
+// Supports reports whether the device implements operation op.
 func (di *DeviceInfo) Supports(op uint16) bool {
 	for _, o := range di.Operations {
 		if o == op {
@@ -248,6 +251,7 @@ func parseDeviceInfo(b []byte) (DeviceInfo, error) {
 	return di, d.err
 }
 
+// StorageInfo is the part of the MTP StorageInfo dataset that droidfs uses.
 type StorageInfo struct {
 	ID          uint32
 	Access      uint16 // 0 = read-write
@@ -271,6 +275,7 @@ func parseStorageInfo(b []byte) (StorageInfo, error) {
 	return si, d.err
 }
 
+// ObjectInfo is the part of the MTP ObjectInfo dataset that droidfs uses.
 type ObjectInfo struct {
 	Storage  uint32
 	Format   uint16
@@ -280,6 +285,7 @@ type ObjectInfo struct {
 	Modified time.Time
 }
 
+// IsDir reports whether the object is a folder.
 func (oi *ObjectInfo) IsDir() bool { return oi.Format == FormatAssociation }
 
 func parseObjectInfo(b []byte) (ObjectInfo, error) {

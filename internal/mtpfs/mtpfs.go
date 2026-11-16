@@ -28,6 +28,7 @@ var ErrNoStorage = errors.New("no storage visible: unlock the device and choose 
 // OpenFunc opens the USB transport of the device.
 type OpenFunc func(ctx context.Context) (mtp.Transport, error)
 
+// Options are the time bounds and cache lifetimes of the backend.
 type Options struct {
 	MetaTimeout time.Duration // lookups, create, rename, ...
 	DataTimeout time.Duration // one read or write
@@ -38,6 +39,7 @@ type Options struct {
 	MTP         mtp.Options
 }
 
+// DefaultOptions returns the values used in production.
 func DefaultOptions() Options {
 	return Options{
 		MetaTimeout: 12 * time.Second,
@@ -131,10 +133,13 @@ type Backend struct {
 	desc  string
 }
 
+// New returns a disconnected backend that reaches the device through open.
 func New(open OpenFunc, opt Options) *Backend { return &Backend{open: open, opt: opt} }
 
 // ------------------------------------------------------------ connection
 
+// Connect opens an MTP session and reads the device's storages. On success
+// the backend is online until the channel returned by Down is closed.
 func (b *Backend) Connect(ctx context.Context) error {
 	b.Disconnect()
 	t, err := b.open(ctx)
@@ -226,6 +231,7 @@ func (b *Backend) drop(s *session) {
 	})
 }
 
+// Disconnect drops the current session, if any.
 func (b *Backend) Disconnect() {
 	b.mu.RLock()
 	s := b.cur
@@ -235,6 +241,8 @@ func (b *Backend) Disconnect() {
 	}
 }
 
+// Down is closed when the current session ends; it is already closed while
+// the backend is offline.
 func (b *Backend) Down() <-chan struct{} {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
@@ -246,6 +254,7 @@ func (b *Backend) Down() <-chan struct{} {
 	return b.cur.down
 }
 
+// Online reports whether the backend currently has a live session.
 func (b *Backend) Online() bool {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
@@ -259,6 +268,7 @@ func (b *Backend) Root() string {
 	return b.desc
 }
 
+// Epoch implements vfs.Backend.
 func (b *Backend) Epoch() uint64 { return b.epoch.Load() }
 
 func (b *Backend) sess() (*session, error) {
@@ -657,6 +667,7 @@ func (s *session) noteWrite(n *node, end uint64, truncate bool) {
 
 // ------------------------------------------------------------ operations
 
+// Stat implements vfs.Backend.
 func (b *Backend) Stat(rel string) (proto.Attr, error) {
 	s, err := b.sess()
 	if err != nil {
@@ -700,6 +711,7 @@ func (b *Backend) Stat(rel string) (proto.Attr, error) {
 	return s.attr(n), nil
 }
 
+// ReadDir implements vfs.Backend.
 func (b *Backend) ReadDir(rel string) ([]proto.DirEnt, error) {
 	s, err := b.sess()
 	if err != nil {
@@ -747,6 +759,7 @@ func (b *Backend) file(rel string) (*session, *node, error) {
 	return s, n, nil
 }
 
+// Read implements vfs.Backend.
 func (b *Backend) Read(rel string, off uint64, count uint32) ([]byte, bool, proto.Attr, error) {
 	s, n, err := b.file(rel)
 	if err != nil {
@@ -771,6 +784,7 @@ func (b *Backend) Read(rel string, off uint64, count uint32) ([]byte, bool, prot
 	return data, off+uint64(len(data)) >= a.Size, a, nil
 }
 
+// Write implements vfs.Backend.
 func (b *Backend) Write(rel string, off uint64, data []byte) (pre, post proto.Attr, err error) {
 	s, n, err := b.file(rel)
 	if err != nil {
@@ -793,6 +807,7 @@ func (b *Backend) Write(rel string, off uint64, data []byte) (pre, post proto.At
 	return pre, s.attr(n), nil
 }
 
+// Truncate implements vfs.Backend.
 func (b *Backend) Truncate(rel string, size uint64) error {
 	s, n, err := b.file(rel)
 	if err != nil {
@@ -858,6 +873,7 @@ func (s *session) make(p *node, name string, dir bool) (*node, error) {
 	return n, nil
 }
 
+// Create implements vfs.Backend.
 func (b *Backend) Create(rel string, mode uint32, excl, trunc bool) (proto.Attr, error) {
 	s, p, name, err := b.parentOf(rel)
 	if err != nil {
@@ -891,6 +907,7 @@ func (b *Backend) Create(rel string, mode uint32, excl, trunc bool) (proto.Attr,
 	return s.attr(n), nil
 }
 
+// Mkdir implements vfs.Backend.
 func (b *Backend) Mkdir(rel string, mode uint32) (proto.Attr, error) {
 	s, p, name, err := b.parentOf(rel)
 	if err != nil {
@@ -957,6 +974,7 @@ func (s *session) remove(p, n *node) error {
 	return nil
 }
 
+// Remove implements vfs.Backend.
 func (b *Backend) Remove(rel string) error {
 	s, p, name, err := b.parentOf(rel)
 	if err != nil {
@@ -972,6 +990,7 @@ func (b *Backend) Remove(rel string) error {
 	return s.remove(p, n)
 }
 
+// Rmdir implements vfs.Backend.
 func (b *Backend) Rmdir(rel string) error {
 	s, p, name, err := b.parentOf(rel)
 	if err != nil {
@@ -1076,6 +1095,7 @@ func (b *Backend) Rename(from, to string) error {
 // Utimes: MTP cannot set a modification time on Android.
 func (b *Backend) Utimes(rel string, sec int64, nsec uint32) error { return proto.ErrNotSupp }
 
+// Statfs implements vfs.Backend by summing all storages.
 func (b *Backend) Statfs() (proto.Statfs, error) {
 	s, err := b.sess()
 	if err != nil {
@@ -1097,8 +1117,10 @@ func (b *Backend) Statfs() (proto.Statfs, error) {
 	return out, nil
 }
 
+// Symlink implements vfs.Backend; MTP has no symbolic links.
 func (b *Backend) Symlink(target, rel string) (proto.Attr, error) {
 	return proto.Attr{}, proto.ErrNotSupp
 }
 
+// Readlink implements vfs.Backend; MTP has no symbolic links.
 func (b *Backend) Readlink(rel string) (string, error) { return "", proto.ErrInval }

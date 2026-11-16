@@ -19,6 +19,7 @@ import (
 // SourcePrefix marks our mounts in the mount table.
 const SourcePrefix = "127.0.0.1:/droidfs/"
 
+// Info is one entry of the system mount table.
 type Info struct {
 	Point, From, Type string
 }
@@ -81,6 +82,7 @@ func IsMounted(point string) bool {
 	return false
 }
 
+// Options describe how Mount attaches a droidfs NFS server.
 type Options struct {
 	Port     int
 	Name     string // appears in the mount source
@@ -132,7 +134,7 @@ func Mount(ctx context.Context, point string, o Options) error {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "/sbin/mount_nfs", "-o", strings.Join(opts, ","), SourcePrefix+o.Name, point)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("mount_nfs: %v: %s", err, bytes.TrimSpace(out))
+		return fmt.Errorf("mount_nfs: %w: %s", err, bytes.TrimSpace(out))
 	}
 	return nil
 }
@@ -142,7 +144,7 @@ func run(timeout time.Duration, name string, args ...string) error {
 	defer cancel()
 	out, err := exec.CommandContext(ctx, name, args...).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("%s: %v: %s", name, err, bytes.TrimSpace(out))
+		return fmt.Errorf("%s: %w: %s", name, err, bytes.TrimSpace(out))
 	}
 	return nil
 }

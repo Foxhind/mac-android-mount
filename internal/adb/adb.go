@@ -21,6 +21,7 @@ import (
 
 const stepTimeout = 10 * time.Second
 
+// Client talks to the local adb server.
 type Client struct {
 	Addr string
 
@@ -28,6 +29,8 @@ type Client struct {
 	lastStart time.Time
 }
 
+// New returns a client for the adb server at 127.0.0.1:5037, or at the port
+// in ANDROID_ADB_SERVER_PORT.
 func New() *Client {
 	addr := "127.0.0.1:5037"
 	if p := os.Getenv("ANDROID_ADB_SERVER_PORT"); p != "" {
@@ -44,6 +47,7 @@ type Device struct {
 	Props  map[string]string
 }
 
+// Ready reports whether the device is online and authorized.
 func (d Device) Ready() bool { return d.State == "device" }
 
 // FindADB locates the adb binary.
@@ -93,7 +97,7 @@ func (c *Client) dial(ctx context.Context) (net.Conn, error) {
 		return conn, nil
 	}
 	if serr := c.startServer(ctx); serr != nil {
-		return nil, fmt.Errorf("adb server unreachable: %v (%v)", err, serr)
+		return nil, fmt.Errorf("adb server unreachable: %w (starting it: %w)", err, serr)
 	}
 	return d.DialContext(ctx, "tcp", c.Addr)
 }

@@ -42,8 +42,8 @@ The daemon waits for devices and mounts each one at `~/DroidFS/<model>`.
 | `-open` | off | open the volume in Finder after mounting |
 | `-trace` | off | log every NFS request |
 
-`droidfs devices` shows what adb sees. `droidfs unmount` force-unmounts all
-droidfs volumes (cleanup after a crash).
+`droidfs devices` lists the devices seen over adb and MTP. `droidfs unmount`
+force-unmounts all droidfs volumes (cleanup after a crash).
 
 ## How it works
 

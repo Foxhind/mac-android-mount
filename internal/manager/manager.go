@@ -31,6 +31,7 @@ import (
 	"droidfs/internal/vfs"
 )
 
+// Config holds the daemon settings, mostly taken from command-line flags.
 type Config struct {
 	Mode            string        // "auto", "adb" or "mtp"
 	Serial          string        // only this device; empty = all
@@ -54,6 +55,8 @@ type mtpSeen struct {
 	since time.Time
 }
 
+// Manager tracks the devices seen over adb and USB and runs one mounted
+// unit per device.
 type Manager struct {
 	cfg Config
 	adb *adb.Client
@@ -65,6 +68,7 @@ type Manager struct {
 	hinted   map[string]string     // serial -> last non-ready state we complained about
 }
 
+// New returns a manager for cfg; an empty Mode means "auto".
 func New(cfg Config) *Manager {
 	if cfg.Mode == "" {
 		cfg.Mode = "auto"
@@ -327,7 +331,6 @@ type unit struct {
 	wake    chan struct{}
 	stop    chan struct{}
 	done    chan struct{}
-	ctx     context.Context // cancelled when stop is closed
 }
 
 func sanitize(s string) string {
@@ -365,12 +368,6 @@ func (m *Manager) startUnitLocked(key, model, id string, be backend) *unit {
 		stop:   make(chan struct{}),
 		done:   make(chan struct{}),
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	u.ctx = ctx
-	go func() {
-		<-u.stop
-		cancel()
-	}()
 	m.units[key] = u
 	if be != nil {
 		go u.run()
@@ -397,6 +394,18 @@ func (u *unit) setPresent(p bool) {
 func (u *unit) run() {
 	defer close(u.done)
 	cfg := u.m.cfg
+
+	// ctx is cancelled when the unit is stopped, so a connect or mount in
+	// progress gives up at once.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		select {
+		case <-u.stop:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
 
 	vopt := vfs.DefaultOptions()
 	vopt.ReadOnly = cfg.ReadOnly
@@ -453,10 +462,10 @@ func (u *unit) run() {
 			online = false
 		}
 		if !online && present && !now.Before(nextTry) {
-			ctx, cancel := context.WithTimeout(u.ctx, 30*time.Second)
-			err := u.be.Connect(ctx)
-			cancel()
-			if u.ctx.Err() != nil {
+			cctx, ccancel := context.WithTimeout(ctx, 30*time.Second)
+			err := u.be.Connect(cctx)
+			ccancel()
+			if ctx.Err() != nil {
 				continue // stopping; the select below returns
 			}
 			if err != nil {
@@ -485,7 +494,7 @@ func (u *unit) run() {
 		if online {
 			offlineSince = time.Time{}
 			if !mounted && !ejected && !now.Before(nextTry) {
-				err := mount.Mount(u.ctx, u.point, mount.Options{
+				err := mount.Mount(ctx, u.point, mount.Options{
 					Port: u.srv.Port(), Name: u.name, ReadOnly: cfg.ReadOnly,
 				})
 				if err != nil {
@@ -555,7 +564,7 @@ func UnmountAll(l *log.Logger) error {
 		if err := mount.Unmount(st.Point, true); err != nil {
 			l.Printf("  %v", err)
 			if firstErr == nil {
-				firstErr = fmt.Errorf("could not unmount %s", st.Point)
+				firstErr = fmt.Errorf("could not unmount %s: %w", st.Point, err)
 			}
 			continue
 		}

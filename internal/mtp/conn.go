@@ -32,6 +32,7 @@ type Transport interface {
 	Close()
 }
 
+// Options are the time bounds of a Conn.
 type Options struct {
 	// SendTimeout bounds each outgoing transfer.
 	SendTimeout time.Duration
@@ -42,10 +43,12 @@ type Options struct {
 	ReplyTimeout time.Duration
 }
 
+// DefaultOptions returns the timeouts used in production.
 func DefaultOptions() Options {
 	return Options{SendTimeout: 5 * time.Second, ReplyTimeout: 25 * time.Second}
 }
 
+// Event is an asynchronous notification sent by the device.
 type Event struct {
 	Code   uint16
 	Params []uint32
@@ -86,7 +89,7 @@ func Open(ctx context.Context, t Transport, opt Options, onEvent func(Event)) (*
 	if c.outMax <= 0 {
 		c.outMax = 512
 	}
-	_, err := run(c, ctx, func() (struct{}, error) {
+	_, err := run(ctx, c, func() (struct{}, error) {
 		_, data, err := c.xact(OpGetDeviceInfo, nil, nil, false)
 		if err != nil {
 			return struct{}{}, err
@@ -117,6 +120,7 @@ func Open(ctx context.Context, t Transport, opt Options, onEvent func(Event)) (*
 // Dead is closed when the session can no longer be used.
 func (c *Conn) Dead() <-chan struct{} { return c.dead }
 
+// Err returns why the session died, or nil while it is usable.
 func (c *Conn) Err() error {
 	select {
 	case <-c.dead:
@@ -182,7 +186,7 @@ func (c *Conn) eventLoop(onEvent func(Event)) {
 
 // run executes fn under the transaction lock, giving up waiting (not the
 // transaction) when ctx expires or the session dies.
-func run[T any](c *Conn, ctx context.Context, fn func() (T, error)) (T, error) {
+func run[T any](ctx context.Context, c *Conn, fn func() (T, error)) (T, error) {
 	var zero T
 	select {
 	case <-c.dead:
@@ -349,13 +353,16 @@ func (c *Conn) readContainer() (typ, code uint16, tid uint32, payload []byte, er
 
 // ------------------------------------------------------------- operations
 
+// CanEdit reports whether the device supports Android's in-place edit
+// extension, which writes at an offset require.
 func (c *Conn) CanEdit() bool {
 	return c.Info.Supports(OpBeginEditObject) && c.Info.Supports(OpSendPartialObject) &&
 		c.Info.Supports(OpTruncateObject) && c.Info.Supports(OpEndEditObject)
 }
 
+// GetStorageIDs lists the storages the device currently exposes.
 func (c *Conn) GetStorageIDs(ctx context.Context) ([]uint32, error) {
-	return run(c, ctx, func() ([]uint32, error) {
+	return run(ctx, c, func() ([]uint32, error) {
 		_, data, err := c.xact(OpGetStorageIDs, nil, nil, false)
 		if err != nil {
 			return nil, err
@@ -366,8 +373,9 @@ func (c *Conn) GetStorageIDs(ctx context.Context) ([]uint32, error) {
 	})
 }
 
+// GetStorageInfo describes one storage.
 func (c *Conn) GetStorageInfo(ctx context.Context, id uint32) (StorageInfo, error) {
-	return run(c, ctx, func() (StorageInfo, error) {
+	return run(ctx, c, func() (StorageInfo, error) {
 		_, data, err := c.xact(OpGetStorageInfo, []uint32{id}, nil, false)
 		if err != nil {
 			return StorageInfo{}, err
@@ -380,7 +388,7 @@ func (c *Conn) GetStorageInfo(ctx context.Context, id uint32) (StorageInfo, erro
 
 // GetObjectHandles lists the children of parent (RootParent for the top).
 func (c *Conn) GetObjectHandles(ctx context.Context, storage, parent uint32) ([]uint32, error) {
-	return run(c, ctx, func() ([]uint32, error) {
+	return run(ctx, c, func() ([]uint32, error) {
 		_, data, err := c.xact(OpGetObjectHandles, []uint32{storage, 0, parent}, nil, false)
 		if err != nil {
 			return nil, err
@@ -391,8 +399,9 @@ func (c *Conn) GetObjectHandles(ctx context.Context, storage, parent uint32) ([]
 	})
 }
 
+// GetObjectInfo returns the metadata of an object.
 func (c *Conn) GetObjectInfo(ctx context.Context, h uint32) (ObjectInfo, error) {
-	return run(c, ctx, func() (ObjectInfo, error) {
+	return run(ctx, c, func() (ObjectInfo, error) {
 		_, data, err := c.xact(OpGetObjectInfo, []uint32{h}, nil, false)
 		if err != nil {
 			return ObjectInfo{}, err
@@ -403,7 +412,7 @@ func (c *Conn) GetObjectInfo(ctx context.Context, h uint32) (ObjectInfo, error) 
 
 // GetObjectSize returns the 64-bit size of an object.
 func (c *Conn) GetObjectSize(ctx context.Context, h uint32) (uint64, error) {
-	return run(c, ctx, func() (uint64, error) {
+	return run(ctx, c, func() (uint64, error) {
 		_, data, err := c.xact(OpGetObjectPropValue, []uint32{h, PropObjectSize}, nil, false)
 		if err != nil {
 			return 0, err
@@ -416,7 +425,7 @@ func (c *Conn) GetObjectSize(ctx context.Context, h uint32) (uint64, error) {
 
 // ReadAt reads up to n bytes at off; fewer are returned at end of file.
 func (c *Conn) ReadAt(ctx context.Context, h uint32, off uint64, n uint32) ([]byte, error) {
-	return run(c, ctx, func() ([]byte, error) {
+	return run(ctx, c, func() ([]byte, error) {
 		var data []byte
 		var err error
 		switch {
@@ -432,21 +441,24 @@ func (c *Conn) ReadAt(ctx context.Context, h uint32, off uint64, n uint32) ([]by
 }
 
 func (c *Conn) simple(ctx context.Context, code uint16, params ...uint32) error {
-	_, err := run(c, ctx, func() (struct{}, error) {
+	_, err := run(ctx, c, func() (struct{}, error) {
 		_, _, err := c.xact(code, params, nil, false)
 		return struct{}{}, err
 	})
 	return err
 }
 
+// BeginEdit opens an object for in-place editing.
 func (c *Conn) BeginEdit(ctx context.Context, h uint32) error {
 	return c.simple(ctx, OpBeginEditObject, h)
 }
 
+// EndEdit commits an edit; the device then re-indexes the object.
 func (c *Conn) EndEdit(ctx context.Context, h uint32) error {
 	return c.simple(ctx, OpEndEditObject, h)
 }
 
+// Truncate sets the size of an object that is being edited.
 func (c *Conn) Truncate(ctx context.Context, h uint32, size uint64) error {
 	return c.simple(ctx, OpTruncateObject, h, uint32(size), uint32(size>>32))
 }
@@ -454,7 +466,7 @@ func (c *Conn) Truncate(ctx context.Context, h uint32, size uint64) error {
 // WriteAt writes data at off into an object that is being edited.
 func (c *Conn) WriteAt(ctx context.Context, h uint32, off uint64, data []byte) error {
 	data = append([]byte(nil), data...) // the transaction may outlive the caller
-	_, err := run(c, ctx, func() (struct{}, error) {
+	_, err := run(ctx, c, func() (struct{}, error) {
 		_, _, err := c.xact(OpSendPartialObject, []uint32{h, uint32(off), uint32(off >> 32), uint32(len(data))}, data, true)
 		return struct{}{}, err
 	})
@@ -463,7 +475,7 @@ func (c *Conn) WriteAt(ctx context.Context, h uint32, off uint64, data []byte) e
 
 // Create makes an empty file or a folder and returns its handle.
 func (c *Conn) Create(ctx context.Context, storage, parent uint32, name string, dir bool) (uint32, error) {
-	return run(c, ctx, func() (uint32, error) {
+	return run(ctx, c, func() (uint32, error) {
 		oi := ObjectInfo{Storage: storage, Parent: parent, Name: name, Format: FormatForName(name), Modified: time.Now()}
 		if dir {
 			oi.Format = FormatAssociation
@@ -485,18 +497,21 @@ func (c *Conn) Create(ctx context.Context, storage, parent uint32, name string, 
 	})
 }
 
+// Delete removes an object.
 func (c *Conn) Delete(ctx context.Context, h uint32) error {
 	return c.simple(ctx, OpDeleteObject, h, 0)
 }
 
+// Move puts an object under a new parent, possibly on another storage.
 func (c *Conn) Move(ctx context.Context, h, storage, parent uint32) error {
 	return c.simple(ctx, OpMoveObject, h, storage, parent)
 }
 
+// Rename changes an object's file name.
 func (c *Conn) Rename(ctx context.Context, h uint32, name string) error {
 	var e enc
 	e.str(name)
-	_, err := run(c, ctx, func() (struct{}, error) {
+	_, err := run(ctx, c, func() (struct{}, error) {
 		_, _, err := c.xact(OpSetObjectPropValue, []uint32{h, PropObjectFileName}, e.b, true)
 		return struct{}{}, err
 	})

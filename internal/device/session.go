@@ -69,14 +69,17 @@ func NewSession(rwc io.ReadWriteCloser, linkTimeout time.Duration) *Session {
 	return s
 }
 
+// Done is closed when the session has failed or been closed.
 func (s *Session) Done() <-chan struct{} { return s.done }
 
+// Err returns why the session ended, or nil while it is alive.
 func (s *Session) Err() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.err
 }
 
+// Close ends the session and fails every pending call.
 func (s *Session) Close() { s.fail(errors.New("session closed")) }
 
 func (s *Session) fail(err error) {

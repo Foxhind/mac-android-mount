@@ -1,5 +1,6 @@
-// droidfs-agent runs on the Android device (started through `adb exec:`) and
-// serves file system requests from the host over stdin/stdout.
+// Command droidfs-agent runs on the Android device (started through
+// `adb exec:`) and serves file system requests from the host over
+// stdin/stdout.
 //
 // It must never write anything but protocol frames to stdout/stderr: on old
 // adbd both streams share the same socket.

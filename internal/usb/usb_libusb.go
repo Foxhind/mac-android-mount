@@ -48,6 +48,7 @@ const (
 	ErrPipe     Error = -9
 )
 
+// Error implements error with libusb's description of the code.
 func (e Error) Error() string { return "usb: " + C.GoString(C.libusb_strerror(C.int(e))) }
 
 // Interface describes the first alternate setting of one interface.
@@ -190,10 +191,16 @@ func (d *Device) String(idx uint8) string {
 	return C.GoStringN((*C.char)(unsafe.Pointer(&buf[0])), n)
 }
 
+// Manufacturer returns the manufacturer string descriptor.
 func (d *Device) Manufacturer() string { return d.String(d.iManuf) }
-func (d *Device) Product() string      { return d.String(d.iProd) }
-func (d *Device) Serial() string       { return d.String(d.iSerial) }
 
+// Product returns the product string descriptor.
+func (d *Device) Product() string { return d.String(d.iProd) }
+
+// Serial returns the serial number string descriptor.
+func (d *Device) Serial() string { return d.String(d.iSerial) }
+
+// Claim claims interface iface; Close releases it.
 func (d *Device) Claim(iface uint8) error {
 	if rc := C.libusb_claim_interface(d.h, C.int(iface)); rc != 0 {
 		return Error(rc)
@@ -235,6 +242,7 @@ func (d *Device) Interrupt(ep uint8, buf []byte, timeout time.Duration) (int, er
 	return int(done), nil
 }
 
+// ClearHalt clears a stall condition on endpoint ep.
 func (d *Device) ClearHalt(ep uint8) error {
 	if rc := C.libusb_clear_halt(d.h, C.uchar(ep)); rc != 0 {
 		return Error(rc)
@@ -242,6 +250,7 @@ func (d *Device) ClearHalt(ep uint8) error {
 	return nil
 }
 
+// Reset performs a USB port reset of the device.
 func (d *Device) Reset() error {
 	if rc := C.libusb_reset_device(d.h); rc != 0 {
 		return Error(rc)

@@ -93,6 +93,8 @@ func (d *ADBDialer) launch(ctx context.Context, remote string) (net.Conn, error)
 	return conn, nil
 }
 
+// Dial starts the agent on the device, reinstalling it if it is missing or
+// stale, and returns its stream with the banner already consumed.
 func (d *ADBDialer) Dial(ctx context.Context) (io.ReadWriteCloser, error) {
 	remote, bin, err := d.resolve(ctx)
 	if err != nil {
@@ -108,7 +110,7 @@ func (d *ADBDialer) Dial(ctx context.Context) (io.ReadWriteCloser, error) {
 	// Missing or stale: (re)install and try once more.
 	d.ADB.Exec(ctx, d.Serial, "rm -f "+remoteDir+"/droidfs-agent-*", 10*time.Second)
 	if perr := d.ADB.Push(ctx, d.Serial, remote, 0o100755, bin); perr != nil {
-		return nil, fmt.Errorf("install agent: %w (first attempt: %v)", perr, err)
+		return nil, fmt.Errorf("install agent: %w (first attempt: %w)", perr, err)
 	}
 	return d.launch(ctx, remote)
 }

@@ -40,6 +40,7 @@ type Backend interface {
 	Epoch() uint64
 }
 
+// Options control write access and cache lifetimes.
 type Options struct {
 	ReadOnly bool
 	// KeepMacMetadata stores ._* and .DS_Store files on the device instead
@@ -53,6 +54,7 @@ type Options struct {
 	DirWait  time.Duration // wait for a listing before answering "try later"
 }
 
+// DefaultOptions returns the values used in production.
 func DefaultOptions() Options {
 	return Options{
 		AttrTTL:  time.Second,
@@ -76,6 +78,7 @@ type Attr struct {
 	proto.Attr
 }
 
+// DirEntry is one entry of a Listing.
 type DirEntry struct {
 	Name string
 	Attr Attr
@@ -119,6 +122,8 @@ type exclEnt struct {
 	exp  time.Time
 }
 
+// FS maps NFS file IDs to device paths and caches attributes and listings
+// in front of a Backend. It is safe for concurrent use.
 type FS struct {
 	be       Backend
 	opt      Options
@@ -143,6 +148,7 @@ type FS struct {
 	stop chan struct{}
 }
 
+// New returns an FS over be. Call Close to stop its background cleanup.
 func New(be Backend, opt Options) *FS {
 	var b [8]byte
 	rand.Read(b[:])
@@ -165,11 +171,13 @@ func New(be Backend, opt Options) *FS {
 	return fs
 }
 
+// Close stops the background cache cleanup.
 func (fs *FS) Close() { close(fs.stop) }
 
 // Instance identifies this FS object; it is part of every file handle.
 func (fs *FS) Instance() uint64 { return fs.instance }
 
+// ReadOnly reports whether writes are refused.
 func (fs *FS) ReadOnly() bool { return fs.opt.ReadOnly }
 
 // WriteVerf changes whenever unstable writes may have been lost, i.e. on
@@ -441,6 +449,7 @@ func (fs *FS) CachedAttr(id uint64) (Attr, bool) { return fs.cached(id) }
 
 // --------------------------------------------------------------- operations
 
+// GetAttr returns the current attributes of file id.
 func (fs *FS) GetAttr(id uint64) (Attr, proto.Status) {
 	rel, ok := fs.pathOf(id)
 	if !ok {
@@ -459,6 +468,7 @@ func (fs *FS) GetAttr(id uint64) (Attr, proto.Status) {
 	return fs.present(id, a), proto.OK
 }
 
+// Lookup finds name in directory dir.
 func (fs *FS) Lookup(dir uint64, name string) (Attr, proto.Status) {
 	drel, ok := fs.pathOf(dir)
 	if !ok {
@@ -583,6 +593,7 @@ func (fs *FS) ReadDir(dir uint64, cookie uint64) (*Listing, proto.Status) {
 	return &Listing{Verf: s.verf, Dot: dot, DotDot: dotdot, Entries: s.ents}, proto.OK
 }
 
+// Read reads up to count bytes of file id at off and reports end of file.
 func (fs *FS) Read(id uint64, off uint64, count uint32) ([]byte, bool, proto.Status) {
 	rel, ok := fs.pathOf(id)
 	if !ok {
@@ -673,6 +684,7 @@ func (fs *FS) Write(id uint64, off uint64, data []byte) (pre, post Attr, st prot
 	return fs.present(id, rawPre), fs.present(id, rawPost), proto.OK
 }
 
+// Commit makes earlier writes to file id durable on the device.
 func (fs *FS) Commit(id uint64) proto.Status {
 	rel, ok := fs.pathOf(id)
 	if !ok {
@@ -779,6 +791,7 @@ func (fs *FS) Create(dir uint64, name string, mode uint32, excl, trunc bool, ver
 	return fs.present(id, a), proto.OK
 }
 
+// Mkdir creates directory name in dir.
 func (fs *FS) Mkdir(dir uint64, name string, mode uint32) (Attr, proto.Status) {
 	if fs.opt.ReadOnly {
 		return Attr{}, proto.ErrROFS
@@ -800,6 +813,7 @@ func (fs *FS) Mkdir(dir uint64, name string, mode uint32) (Attr, proto.Status) {
 	return fs.present(fs.bornLocked(rel, a), a), proto.OK
 }
 
+// Symlink creates a symbolic link name in dir pointing to target.
 func (fs *FS) Symlink(dir uint64, name, target string) (Attr, proto.Status) {
 	if fs.opt.ReadOnly {
 		return Attr{}, proto.ErrROFS
@@ -821,6 +835,7 @@ func (fs *FS) Symlink(dir uint64, name, target string) (Attr, proto.Status) {
 	return fs.present(fs.bornLocked(rel, a), a), proto.OK
 }
 
+// Readlink returns the target of symbolic link id.
 func (fs *FS) Readlink(id uint64) (string, proto.Status) {
 	rel, ok := fs.pathOf(id)
 	if !ok {
@@ -830,6 +845,7 @@ func (fs *FS) Readlink(id uint64) (string, proto.Status) {
 	return s, status(err)
 }
 
+// Remove deletes file name from dir.
 func (fs *FS) Remove(dir uint64, name string) proto.Status {
 	if fs.opt.ReadOnly {
 		return proto.ErrROFS
@@ -868,6 +884,7 @@ func (fs *FS) Remove(dir uint64, name string) proto.Status {
 	return proto.OK
 }
 
+// Rmdir deletes empty directory name from dir.
 func (fs *FS) Rmdir(dir uint64, name string) proto.Status {
 	if fs.opt.ReadOnly {
 		return proto.ErrROFS
@@ -897,6 +914,7 @@ func (fs *FS) Rmdir(dir uint64, name string) proto.Status {
 	return proto.OK
 }
 
+// Rename moves fromName in fromDir to toName in toDir.
 func (fs *FS) Rename(fromDir uint64, fromName string, toDir uint64, toName string) proto.Status {
 	if fs.opt.ReadOnly {
 		return proto.ErrROFS
@@ -1064,6 +1082,7 @@ func (fs *FS) SetAttr(id uint64, size *uint64, mtime *time.Time) (Attr, proto.St
 	return fs.GetAttr(id)
 }
 
+// Statfs returns file system usage, cached briefly.
 func (fs *FS) Statfs() (proto.Statfs, proto.Status) {
 	fs.mu.Lock()
 	if time.Now().Before(fs.fsstatExp) {

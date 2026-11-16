@@ -33,6 +33,7 @@ const (
 	acceptGarbageArgs  = 4
 )
 
+// Server is an NFSv3 server for one vfs.FS.
 type Server struct {
 	fs       *vfs.FS
 	ln       net.Listener
@@ -65,8 +66,10 @@ func Serve(fs *vfs.FS) (*Server, error) {
 	return s, nil
 }
 
+// Port returns the loopback TCP port the server listens on.
 func (s *Server) Port() int { return s.ln.Addr().(*net.TCPAddr).Port }
 
+// Close stops accepting connections and drops the open ones.
 func (s *Server) Close() {
 	s.mu.Lock()
 	s.closed = true

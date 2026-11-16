@@ -1,22 +1,22 @@
 # droidfs
 
-Монтирует хранилище Android-устройств как обычные папки macOS — с чтением и
-записью, без kext/macFUSE. При обрыве связи операции завершаются ошибкой, а не
-зависают; при возврате устройства том оживает сам.
+Mounts Android device storage as ordinary macOS folders, read-write, with no
+kext or macFUSE. When the connection drops, operations fail with an error
+instead of hanging; when the device comes back, the volume recovers on its own.
 
-Два транспорта:
+Two transports:
 
-- **ADB** (USB или Wi-Fi) — основной: быстрее и надёжнее, но на устройстве
-  должна быть включена «Отладка по USB».
-- **MTP** — запасной: достаточно выбрать на устройстве «Передача файлов».
+- **ADB** (USB or Wi-Fi) is the primary one: faster and more reliable, but the
+  device must have "USB debugging" enabled.
+- **MTP** is the fallback: selecting "File transfer" on the device is enough.
 
-В режиме `auto` (по умолчанию) устройство монтируется через ADB, если оно там
-видно, иначе через MTP.
+In `auto` mode (the default) a device is mounted over ADB if ADB can see it,
+otherwise over MTP.
 
-## Запуск
+## Running
 
-Для MTP нужен libusb (`brew install libusb pkg-config`); без него собирается
-вариант только с ADB: `make build-nomtp`.
+MTP needs libusb (`brew install libusb pkg-config`); without it you can build
+an ADB-only variant with `make build-nomtp`.
 
 ```bash
 make build
@@ -26,119 +26,118 @@ make build
 ./bin/droidfs
 ```
 
-Демон ждёт устройства и монтирует каждое в `~/DroidFS/<модель>`. `Ctrl-C` —
-аккуратно размонтировать и выйти.
+The daemon waits for devices and mounts each one at `~/DroidFS/<model>`.
+`Ctrl-C` unmounts cleanly and exits.
 
-| Флаг | По умолчанию | Смысл |
+| Flag | Default | Meaning |
 |---|---|---|
-| `-mode auto\|adb\|mtp` | `auto` | какой транспорт использовать |
-| `-s <serial>` | все устройства | монтировать только одно |
-| `-root <путь>` | `/sdcard` | какой каталог устройства показывать (только ADB) |
-| `-dir <путь>` | `~/DroidFS` | где создавать точки монтирования |
-| `-grace <время>` | `10s` | сколько держать том после потери связи |
-| `-ro` | выкл | только чтение |
-| `-keep-mac-metadata` | выкл | писать `._*` и `.DS_Store` на устройство |
-| `-keep-ptpcamerad` | выкл | MTP: не завершать системный `ptpcamerad`, даже если он держит устройство |
-| `-open` | выкл | открыть том в Finder после монтирования |
-| `-trace` | выкл | логировать каждый NFS-запрос |
+| `-mode auto\|adb\|mtp` | `auto` | which transport to use |
+| `-s <serial>` | all devices | mount only one device |
+| `-root <path>` | `/sdcard` | which device directory to expose (ADB only) |
+| `-dir <path>` | `~/DroidFS` | where to create mount points |
+| `-grace <duration>` | `10s` | how long to keep the volume after the connection is lost |
+| `-ro` | off | read-only |
+| `-keep-mac-metadata` | off | write `._*` and `.DS_Store` to the device |
+| `-keep-ptpcamerad` | off | MTP: do not kill the system `ptpcamerad`, even if it holds the device |
+| `-open` | off | open the volume in Finder after mounting |
+| `-trace` | off | log every NFS request |
 
-`droidfs devices` — что видит adb. `droidfs unmount` — принудительно снять все
-тома droidfs (уборка после аварии).
+`droidfs devices` shows what adb sees. `droidfs unmount` force-unmounts all
+droidfs volumes (cleanup after a crash).
 
-## Как устроено
+## How it works
 
 ```
-Finder / любое приложение
-        │  обычные файловые вызовы
-ядро macOS: встроенный NFS-клиент (mount_nfs, soft)
-        │  NFSv3 по TCP, 127.0.0.1
-droidfs: NFS-сервер → VFS (хэндлы, кэши) → сессии с watchdog
-        │  adb exec: (бинарный мультиплексированный протокол)
-droidfs-agent на устройстве: pread/pwrite/stat/rename/…
+Finder / any application
+        │  ordinary file system calls
+macOS kernel: built-in NFS client (mount_nfs, soft)
+        │  NFSv3 over TCP, 127.0.0.1
+droidfs: NFS server → VFS (handles, caches) → sessions with watchdog
+        │  adb exec: (binary multiplexed protocol)
+droidfs-agent on the device: pread/pwrite/stat/rename/…
 ```
 
-Схема выше — для ADB. В режиме MTP нижние два слоя заменяются на
-`MTP-бэкенд → libusb → MTP-сервер Android`, всё остальное общее.
+The diagram above is for ADB. In MTP mode the bottom two layers are replaced by
+`MTP backend → libusb → Android MTP server`; everything else is shared.
 
-- **Агент.** Статический Go-бинарник (arm, arm64, x86, x86_64) встроен в
-  `droidfs`; при первом подключении кладётся в `/data/local/tmp` и запускается
-  через `adb exec:`. Даёт настоящий произвольный доступ к файлам (запись по
-  смещению, truncate, fsync) и точные коды ошибок — без разбора вывода shell.
-- **Протокол без состояния.** Все операции адресуются путём. Хэндлы файлов
-  живут на стороне Mac, поэтому новый агент после переподключения продолжает
-  обслуживать тот же том.
-- **Метаданные macOS** (`._*`, `.DS_Store`) хранятся в памяти демона и на
-  устройство не попадают.
+- **Agent.** A static Go binary (arm, arm64, x86, x86_64) is embedded in
+  `droidfs`; on first connection it is pushed to `/data/local/tmp` and started
+  via `adb exec:`. It provides true random file access (writes at an offset,
+  truncate, fsync) and exact error codes, with no parsing of shell output.
+- **Stateless protocol.** Every operation is addressed by path. File handles
+  live on the Mac side, so after a reconnect a new agent keeps serving the same
+  volume.
+- **macOS metadata** (`._*`, `.DS_Store`) is kept in the daemon's memory and
+  never reaches the device.
 
-## Режим MTP
+## MTP mode
 
-- Устройства находятся опросом USB раз в секунду. Берутся только те, чей
-  интерфейс называется «MTP» (так делает Android); камеры и iPhone не
-  трогаются.
-- Запись по смещению идёт через Android-расширение MTP (begin edit / send
-  partial object / truncate / end edit). Устройство без него монтируется
-  только для чтения.
-- Правка завершается при `fsync`/закрытии файла или через 3 с простоя — в
-  этот момент Android переиндексирует файл, и он появляется в галерее.
-- Если на устройстве несколько хранилищ (память + SD-карта), в корне тома
-  они видны отдельными папками.
-- Заблокированный телефон не отдаёт хранилища: демон пишет об этом в лог и
-  повторяет попытку, пока экран не разблокируют.
-- macOS сам захватывает PTP-интерфейсы процессом `ptpcamerad`. Если он
-  держит устройство, droidfs завершает его (`killall ptpcamerad`; launchd
-  поднимет его снова по требованию). Отключается флагом `-keep-ptpcamerad`.
+- Devices are found by polling USB once a second. Only devices whose interface
+  is named "MTP" (as Android does) are used; cameras and iPhones are left
+  alone.
+- Writes at an offset go through Android's MTP extension (begin edit / send
+  partial object / truncate / end edit). A device without it is mounted
+  read-only.
+- An edit is finished on `fsync`/file close or after 3 s of inactivity; at that
+  point Android re-indexes the file and it shows up in the gallery.
+- If the device has several storages (internal memory + SD card), they appear
+  as separate folders at the root of the volume.
+- A locked phone does not expose its storages: the daemon logs this and keeps
+  retrying until the screen is unlocked.
+- macOS itself claims PTP interfaces with the `ptpcamerad` process. If it holds
+  the device, droidfs kills it (`killall ptpcamerad`; launchd restarts it on
+  demand). Disable this with the `-keep-ptpcamerad` flag.
 
-Чем MTP хуже ADB:
+Where MTP is worse than ADB:
 
-- одна операция за раз: большая копия задерживает просмотр папок;
-- первое открытие папки стоит по запросу на каждый объект — тысячи фото
-  читаются десятки секунд;
-- замена файла переименованием не атомарна (удаление + переименование);
-- время изменения файла задать нельзя, символических ссылок нет;
-- перенос между папками требует MoveObject (есть не на всех версиях
-  Android); иначе Finder копирует и удаляет.
+- one operation at a time: a large copy delays folder browsing;
+- the first time a folder is opened costs one request per object, so thousands
+  of photos take tens of seconds to list;
+- replacing a file by rename is not atomic (delete + rename);
+- file modification time cannot be set, and there are no symbolic links;
+- moving between folders requires MoveObject (not available on every Android
+  version); otherwise Finder copies and deletes.
 
-## Обрывы и зависания
+## Disconnects and hangs
 
-| Что случилось | Что происходит |
+| What happened | What happens next |
 |---|---|
-| Выдернули кабель | adb закрывает поток, все операции сразу получают `EIO`. Том держится `-grace`, затем принудительно снимается. |
-| Устройство вернулось за время grace | Переподключение, тот же том работает дальше. |
-| Вернулось позже | Том монтируется заново. |
-| Устройство «молчит» (зависло, связь есть) | ADB: ping каждые ~1.5 с; нет ни байта 6 с — связь считается мёртвой. MTP: операция получает `EIO` по своему тайм-ауту, через 25 с тишины сессия считается мёртвой. Дальше как при обрыве. |
-| Одна операция застряла, связь жива | Тайм-аут операции (12 с метаданные, 20 с данные, 25 с fsync) → `EIO` только ей. Четыре подряд — агент перезапускается. |
-| Огромный каталог читается долго | Клиенту отвечаем «повтори позже», листинг дочитывается в фоне. |
-| Упал сам демон | Том смонтирован как `soft` с `deadtimeout`: вызовы получают тайм-аут, следующий запуск демона убирает осиротевший том. |
-| Пользователь извлёк том в Finder | Не перемонтируется до повторного подключения устройства. |
+| Cable unplugged | adb closes the stream and all operations get `EIO` immediately. The volume is kept for `-grace`, then force-unmounted. |
+| Device came back within the grace period | It reconnects and the same volume keeps working. |
+| Came back later | The volume is mounted again. |
+| Device is "silent" (hung, link still up) | ADB: ping every ~1.5 s; not a single byte for 6 s means the link is considered dead. MTP: an operation gets `EIO` on its own timeout, and after 25 s of silence the session is considered dead. Then as for a disconnect. |
+| One operation is stuck, link is alive | Operation timeout (12 s metadata, 20 s data, 25 s fsync) → `EIO` for that operation only. Four in a row and the agent is restarted. |
+| A huge directory takes long to read | The client is told "try again later" while the listing finishes in the background. |
+| The daemon itself crashed | The volume is mounted `soft` with `deadtimeout`: calls time out, and the next daemon start removes the orphaned volume. |
+| The user ejected the volume in Finder | It is not remounted until the device is reconnected. |
 
-Прерванная копия оставляет на устройстве недописанный файл — как и при любом
-другом способе копирования.
+An interrupted copy leaves a partially written file on the device, as with any
+other copying method.
 
-## Ограничения
+## Limitations
 
-- В режиме ADB на Android 10 и старше записанные файлы не попадают в
-  MediaStore (галерею) до пересканирования.
-- Права и владельцы не переносятся: всё показывается как принадлежащее
-  текущему пользователю, реальную проверку доступа делает устройство.
-- NFS-сервер слушает только `127.0.0.1`; корневой хэндл выдаётся только
-  пользователю, запустившему демон, но это не полноценная защита от других
-  локальных пользователей.
-- Только CLI: нет значка в строке меню и автозапуска.
+- In ADB mode on Android 10 and later, written files do not appear in
+  MediaStore (the gallery) until a rescan.
+- Permissions and owners are not carried over: everything is shown as owned by
+  the current user, and the device performs the real access checks.
+- The NFS server listens only on `127.0.0.1`; the root handle is given only to
+  the user who started the daemon, but this is not full protection against
+  other local users.
+- CLI only: no menu bar icon and no autostart.
 
-## Тесты
+## Tests
 
 ```bash
 make test
 ```
 
-Сквозные тесты поднимают настоящий NFS-mount ядра macOS и гоняют один и тот
-же набор сценариев через оба транспорта:
+End-to-end tests set up a real macOS kernel NFS mount and run the same set of
+scenarios through both transports:
 
-- ADB: устройство заменено локально запущенным агентом (тот же код, без adb);
-  в `TestDaemon` собранный бинарник `droidfs` работает через подставной
-  adb-сервер.
-- MTP: устройство заменено эмулятором (`internal/mtp/mtpsim`), который
-  говорит по протоколу на уровне USB-пакетов.
+- ADB: the device is replaced by a locally running agent (same code, no adb);
+  in `TestDaemon` the built `droidfs` binary works through a fake adb server.
+- MTP: the device is replaced by an emulator (`internal/mtp/mtpsim`) that
+  speaks the protocol at the USB packet level.
 
-Эмулятор написан по спецификации и исходникам Android, а не снят с реального
-телефона: совпадение с настоящими устройствами тесты не доказывают.
+The emulator was written from the specification and Android sources, not
+captured from a real phone: the tests do not prove it matches real devices.

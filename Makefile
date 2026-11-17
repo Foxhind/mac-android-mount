@@ -35,6 +35,9 @@ app: build
 	cp "$$(cd gui && swift build -c release --show-bin-path)/MacDroidFS" bin/MacDroidFS.app/Contents/MacOS/
 	cp bin/macdroidfs bin/MacDroidFS.app/Contents/MacOS/macdroidfsd
 	xcrun xcstringstool compile gui/Resources/Localizable.xcstrings --output-directory bin/MacDroidFS.app/Contents/Resources
+	xcrun actool gui/Resources/AppIcon.icon --compile bin/MacDroidFS.app/Contents/Resources \
+		--app-icon AppIcon --platform macosx --minimum-deployment-target 15.0 \
+		--output-partial-info-plist gui/.build/AppIcon-partial.plist >/dev/null
 	codesign --force --sign - bin/MacDroidFS.app/Contents/MacOS/macdroidfsd
 	codesign --force --sign - bin/MacDroidFS.app
 

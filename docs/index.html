@@ -30,8 +30,7 @@
   "applicationCategory": "UtilitiesApplication",
   "operatingSystem": "macOS 15 or later",
   "url": "https://foxhind.github.io/macdroidfs/",
-  "downloadUrl": "https://github.com/Foxhind/macdroidfs",
-  "image": "https://foxhind.github.io/macdroidfs/assets/icon.png",
+  "downloadUrl": "https://github.com/Foxhind/macdroidfs/releases/latest/download/MacDroidFS.dmg",  "image": "https://foxhind.github.io/macdroidfs/assets/icon.png",
   "license": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
   "isAccessibleForFree": true,
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
@@ -213,8 +212,8 @@ code { font-family: var(--mono); font-size: .92em; }
         <h1>Mount your Android phone on your Mac</h1>
         <p class="lead">MacDroidFS connects Android to macOS and shows the phone as a regular folder in Finder. Browse, copy, edit and delete Android files over USB or Wi-Fi. Free, with no kernel extensions and no macFUSE.</p>
         <div class="actions">
-          <a class="button primary" href="https://github.com/Foxhind/macdroidfs">View on GitHub</a>
-          <a class="button secondary" href="#install">How to install</a>
+          <a class="button primary" href="https://github.com/Foxhind/macdroidfs/releases/latest/download/MacDroidFS.dmg">Download for Mac</a>
+          <a class="button secondary" href="https://github.com/Foxhind/macdroidfs">View on GitHub</a>
         </div>
         <ul class="pills" aria-label="Highlights">
           <li>Free</li>
@@ -294,20 +293,22 @@ code { font-family: var(--mono); font-size: .92em; }
     <div class="wrap install">
       <div>
         <h2>Install</h2>
-        <p class="intro">MacDroidFS is built from source for now. You need:</p>
+        <p class="intro">One app for Apple silicon and Intel Macs, signed and notarized by Apple.</p>
         <ul>
-          <li>macOS 15 or later</li>
-          <li>Xcode and <a href="https://go.dev/dl/">Go 1.24</a> or later</li>
-          <li><a href="https://brew.sh">Homebrew</a> for libusb (MTP) and adb (USB debugging)</li>
+          <li><a href="https://github.com/Foxhind/macdroidfs/releases/latest/download/MacDroidFS.dmg">Download MacDroidFS.dmg</a> (macOS 15 or later)</li>
+          <li>Open it and drag MacDroidFS to Applications</li>
+          <li>File transfer (MTP) works right away; USB debugging and Wi-Fi need adb</li>
         </ul>
       </div>
       <div>
-<pre><code>brew install libusb pkg-config android-platform-tools
+<pre><code># adb, for USB debugging and Wi-Fi (optional)
+brew install android-platform-tools</code></pre>
+<pre><code># or build from source (Xcode, Go 1.24+)
+brew install libusb pkg-config
 git clone https://github.com/Foxhind/macdroidfs.git
 cd macdroidfs
-make app
-open bin/MacDroidFS.app</code></pre>
-        <p class="note">The app is not notarized yet: it is signed for the Mac that built it. A command-line version is built with <code>make build</code>; see the <a href="https://github.com/Foxhind/macdroidfs#readme">README</a> for its options.</p>
+make app</code></pre>
+        <p class="note">All versions are on the <a href="https://github.com/Foxhind/macdroidfs/releases">Releases</a> page. A command-line version is built with <code>make build</code>; see the <a href="https://github.com/Foxhind/macdroidfs#readme">README</a> for its options.</p>
       </div>
     </div>
   </section>

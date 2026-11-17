@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://foxhind.github.io/macdroidfs/sitemap.xml

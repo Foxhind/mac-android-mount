@@ -1,5 +1,7 @@
 # macdroidfs
 
+Website: https://foxhind.github.io/macdroidfs/
+
 Mounts Android device storage as ordinary macOS folders, read-write, with no
 kext or macFUSE. When the connection drops, operations fail with an error
 instead of hanging; when the device comes back, the volume recovers on its own.
@@ -179,3 +181,7 @@ scenarios through both transports:
 
 The emulator was written from the specification and Android sources, not
 captured from a real phone: the tests do not prove it matches real devices.
+
+## License
+
+Free to use under [Creative Commons Attribution-NonCommercial-ShareAlike 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/); the full text is in [LICENSE](LICENSE).

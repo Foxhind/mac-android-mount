@@ -66,7 +66,21 @@ The app runs the daemon from its bundle (as `macdroidfsd`) with `-control` and
 Quitting the app unmounts every volume. Only one daemon runs at a time: stop a
 `macdroidfs` started from the terminal before opening the app.
 
-The bundle is signed ad hoc, for the Mac it was built on.
+`make app` signs the bundle ad hoc, for the Mac it was built on.
+
+### Release DMG
+
+`make dmg` builds `bin/dist/MacDroidFS-<version>.dmg`: a universal app
+(arm64 + x86_64) that is installed by dragging it to Applications.
+
+- libusb is built from source (`brew fetch -s libusb`) as a universal dylib and
+  shipped in `Contents/Frameworks`, so the target Mac needs no Homebrew.
+- The app, the daemon and libusb are signed with the "Developer ID
+  Application" certificate from the keychain, with the hardened runtime.
+  `SIGN_ID="Developer ID Application: …"` picks a certificate explicitly,
+  `SIGN_ID=-` signs ad hoc.
+- `NOTARY_PROFILE=<profile>` also notarizes the DMG and staples the ticket.
+  Create the profile once with `xcrun notarytool store-credentials <profile>`.
 
 ### Control API
 
@@ -160,8 +174,9 @@ other copying method.
 - The NFS server listens only on `127.0.0.1`; the root handle is given only to
   the user who started the daemon, but this is not full protection against
   other local users.
-- The app is signed ad hoc and not notarized, so it runs on the Mac that built
-  it. Its interface is in English only; the strings go through a String
+- An app from `make app`, or a DMG built with `SIGN_ID=-`, is not notarized:
+  on another Mac Gatekeeper blocks it until the user allows it in System
+  Settings → Privacy & Security. The app's interface is in English only; the strings go through a String
   Catalog (`gui/Resources/Localizable.xcstrings`), so translations can be
   added.
 

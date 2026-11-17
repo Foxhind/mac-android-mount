@@ -1,4 +1,4 @@
-// Command droidfs-agent runs on the Android device (started through
+// Command macdroidfs-agent runs on the Android device (started through
 // `adb exec:`) and serves file system requests from the host over
 // stdin/stdout.
 //
@@ -17,7 +17,7 @@ import (
 	"syscall"
 	"time"
 
-	"droidfs/internal/proto"
+	"github.com/Foxhind/macdroidfs/internal/proto"
 )
 
 const (
@@ -36,7 +36,7 @@ type agent struct {
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "--version" {
-		os.Stdout.WriteString("droidfs-agent protocol 1\n")
+		os.Stdout.WriteString("macdroidfs-agent protocol 1\n")
 		return
 	}
 	a := &agent{bw: bufio.NewWriterSize(os.Stdout, 256<<10)}

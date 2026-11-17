@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"droidfs/internal/usb"
+	"github.com/Foxhind/macdroidfs/internal/usb"
 )
 
 // USBDevice is an attached device that announces an MTP interface.

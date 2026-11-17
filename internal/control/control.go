@@ -1,5 +1,5 @@
 // Package control serves the daemon's status and commands over a Unix
-// socket, for the DroidFS app and other local tools.
+// socket, for the MacDroidFS app and other local tools.
 //
 // The API is plain HTTP/JSON:
 //
@@ -22,7 +22,7 @@ import (
 	"os"
 	"time"
 
-	"droidfs/internal/manager"
+	"github.com/Foxhind/macdroidfs/internal/manager"
 )
 
 // Daemon is what the control API needs from the daemon.

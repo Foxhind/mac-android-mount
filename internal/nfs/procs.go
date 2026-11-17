@@ -4,8 +4,8 @@ import (
 	"encoding/binary"
 	"time"
 
-	"droidfs/internal/proto"
-	"droidfs/internal/vfs"
+	"github.com/Foxhind/macdroidfs/internal/proto"
+	"github.com/Foxhind/macdroidfs/internal/vfs"
 )
 
 const (

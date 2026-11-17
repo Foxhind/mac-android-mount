@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"droidfs/internal/adb"
-	"droidfs/internal/agentbin"
-	"droidfs/internal/proto"
+	"github.com/Foxhind/macdroidfs/internal/adb"
+	"github.com/Foxhind/macdroidfs/internal/agentbin"
+	"github.com/Foxhind/macdroidfs/internal/proto"
 )
 
 const remoteDir = "/data/local/tmp"
@@ -63,7 +63,7 @@ func (d *ADBDialer) resolve(ctx context.Context) (string, []byte, error) {
 		return "", nil, err
 	}
 	sum := sha256.Sum256(bin)
-	d.remote = remoteDir + "/droidfs-agent-" + hex.EncodeToString(sum[:6])
+	d.remote = remoteDir + "/macdroidfs-agent-" + hex.EncodeToString(sum[:6])
 	d.bin = bin
 	return d.remote, d.bin, nil
 }
@@ -108,7 +108,7 @@ func (d *ADBDialer) Dial(ctx context.Context) (io.ReadWriteCloser, error) {
 		return nil, err
 	}
 	// Missing or stale: (re)install and try once more.
-	d.ADB.Exec(ctx, d.Serial, "rm -f "+remoteDir+"/droidfs-agent-*", 10*time.Second)
+	d.ADB.Exec(ctx, d.Serial, "rm -f "+remoteDir+"/macdroidfs-agent-*", 10*time.Second)
 	if perr := d.ADB.Push(ctx, d.Serial, remote, 0o100755, bin); perr != nil {
 		return nil, fmt.Errorf("install agent: %w (first attempt: %w)", perr, err)
 	}

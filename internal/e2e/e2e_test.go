@@ -20,21 +20,21 @@ import (
 	"testing"
 	"time"
 
-	"droidfs/internal/device"
-	"droidfs/internal/mount"
-	"droidfs/internal/mtp"
-	"droidfs/internal/mtp/mtpsim"
-	"droidfs/internal/mtpfs"
-	"droidfs/internal/nfs"
-	"droidfs/internal/proto"
-	"droidfs/internal/vfs"
+	"github.com/Foxhind/macdroidfs/internal/device"
+	"github.com/Foxhind/macdroidfs/internal/mount"
+	"github.com/Foxhind/macdroidfs/internal/mtp"
+	"github.com/Foxhind/macdroidfs/internal/mtp/mtpsim"
+	"github.com/Foxhind/macdroidfs/internal/mtpfs"
+	"github.com/Foxhind/macdroidfs/internal/nfs"
+	"github.com/Foxhind/macdroidfs/internal/proto"
+	"github.com/Foxhind/macdroidfs/internal/vfs"
 )
 
 // The server side runs in a child process (this test binary re-executed),
 // exactly like the real daemon: a process must never do file I/O on a mount
 // that it serves itself, or the two halves can deadlock inside the kernel.
 func TestMain(m *testing.M) {
-	if os.Getenv("DROIDFS_E2E_SERVER") != "" {
+	if os.Getenv("MACDROIDFS_E2E_SERVER") != "" {
 		serverMain()
 		return
 	}
@@ -60,7 +60,7 @@ func (p *procStream) Close() error {
 // serverMain is the stand-in daemon. It is driven by one-word commands on
 // stdin and answers each with one line on stdout.
 func serverMain() {
-	agent, backing := os.Getenv("DROIDFS_E2E_AGENT"), os.Getenv("DROIDFS_E2E_BACKING")
+	agent, backing := os.Getenv("MACDROIDFS_E2E_AGENT"), os.Getenv("MACDROIDFS_E2E_BACKING")
 	var mu sync.Mutex
 	var procs []*exec.Cmd
 	dial := func(ctx context.Context) (io.ReadWriteCloser, error) {
@@ -103,7 +103,7 @@ func serverMain() {
 	kill := func() { signalAgents(syscall.SIGKILL) }
 	freeze := func() { signalAgents(syscall.SIGSTOP) }
 	replug := func() {}
-	if os.Getenv("DROIDFS_E2E_KIND") == "mtp" {
+	if os.Getenv("MACDROIDFS_E2E_KIND") == "mtp" {
 		sim := mtpsim.New(backing)
 		opt := mtpfs.DefaultOptions()
 		opt.MetaTimeout, opt.DataTimeout = 2*time.Second, 2*time.Second
@@ -125,7 +125,7 @@ func serverMain() {
 		fmt.Println("ERR", err)
 		return
 	}
-	if os.Getenv("DROIDFS_TRACE") != "" {
+	if os.Getenv("MACDROIDFS_TRACE") != "" {
 		srv.Trace = func(f string, a ...any) {
 			fmt.Fprintf(os.Stderr, time.Now().Format("15:04:05.000 ")+f+"\n", a...)
 		}
@@ -173,7 +173,7 @@ func (e *env) ctl(cmd string) string {
 
 func setup(t *testing.T, kind string) *env {
 	t.Helper()
-	tmp, err := os.MkdirTemp("", "droidfs-e2e-")
+	tmp, err := os.MkdirTemp("", "macdroidfs-e2e-")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,11 +181,11 @@ func setup(t *testing.T, kind string) *env {
 	agent := filepath.Join(tmp, "agent")
 	e := &env{t: t, backing: filepath.Join(tmp, "device"), point: filepath.Join(tmp, "mnt")}
 	os.Mkdir(e.backing, 0o755)
-	if out, err := exec.Command("go", "build", "-o", agent, "droidfs/cmd/droidfs-agent").CombinedOutput(); err != nil {
+	if out, err := exec.Command("go", "build", "-o", agent, "github.com/Foxhind/macdroidfs/cmd/macdroidfs-agent").CombinedOutput(); err != nil {
 		t.Fatalf("build agent: %v\n%s", err, out)
 	}
 	e.server = exec.Command(os.Args[0])
-	e.server.Env = append(os.Environ(), "DROIDFS_E2E_SERVER=1", "DROIDFS_E2E_KIND="+kind, "DROIDFS_E2E_AGENT="+agent, "DROIDFS_E2E_BACKING="+e.backing)
+	e.server.Env = append(os.Environ(), "MACDROIDFS_E2E_SERVER=1", "MACDROIDFS_E2E_KIND="+kind, "MACDROIDFS_E2E_AGENT="+agent, "MACDROIDFS_E2E_BACKING="+e.backing)
 	e.server.Stderr = os.Stderr
 	e.ctlIn, _ = e.server.StdinPipe()
 	out, _ := e.server.StdoutPipe()

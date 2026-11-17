@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"droidfs/internal/proto"
+	"github.com/Foxhind/macdroidfs/internal/proto"
 )
 
 // DialFunc opens a fresh agent stream (banner already verified).

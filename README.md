@@ -1,4 +1,4 @@
-# droidfs
+# macdroidfs
 
 Mounts Android device storage as ordinary macOS folders, read-write, with no
 kext or macFUSE. When the connection drops, operations fail with an error
@@ -23,10 +23,10 @@ make build
 ```
 
 ```bash
-./bin/droidfs
+./bin/macdroidfs
 ```
 
-The daemon waits for devices and mounts each one at `~/DroidFS/<model>`.
+The daemon waits for devices and mounts each one at `~/MacDroidFS/<model>`.
 `Ctrl-C` unmounts cleanly and exits.
 
 | Flag | Default | Meaning |
@@ -34,7 +34,7 @@ The daemon waits for devices and mounts each one at `~/DroidFS/<model>`.
 | `-mode auto\|adb\|mtp` | `auto` | which transport to use |
 | `-s <serial>` | all devices | mount only one device |
 | `-root <path>` | `/sdcard` | which device directory to expose (ADB only) |
-| `-dir <path>` | `~/DroidFS` | where to create mount points |
+| `-dir <path>` | `~/MacDroidFS` | where to create mount points |
 | `-grace <duration>` | `10s` | how long to keep the volume after the connection is lost |
 | `-ro` | off | read-only |
 | `-keep-mac-metadata` | off | write `._*` and `.DS_Store` to the device |
@@ -44,12 +44,12 @@ The daemon waits for devices and mounts each one at `~/DroidFS/<model>`.
 | `-control <socket>` | none | serve status and commands on a Unix socket (see below) |
 | `-stdin-lifeline` | off | shut down cleanly when stdin closes |
 
-`droidfs devices` lists the devices seen over adb and MTP. `droidfs unmount`
-force-unmounts all droidfs volumes (cleanup after a crash).
+`macdroidfs devices` lists the devices seen over adb and MTP. `macdroidfs unmount`
+force-unmounts all macdroidfs volumes (cleanup after a crash).
 
-## The DroidFS app
+## The MacDroidFS app
 
-`make app` (needs Xcode) builds `bin/DroidFS.app`, a SwiftUI app around the
+`make app` (needs Xcode) builds `bin/MacDroidFS.app`, a SwiftUI app around the
 same daemon:
 
 - a window with the devices, their state and volume actions (open in Finder,
@@ -59,10 +59,10 @@ same daemon:
   Dock icon can be hidden only while the menu bar icon is shown; with it
   hidden, the app starts in the menu bar without opening its window.
 
-The app runs the daemon from its bundle (as `droidfsd`) with `-control` and
+The app runs the daemon from its bundle (as `macdroidfsd`) with `-control` and
 `-stdin-lifeline`, so the daemon exits with the app, even if the app crashes.
 Quitting the app unmounts every volume. Only one daemon runs at a time: stop a
-`droidfs` started from the terminal before opening the app.
+`macdroidfs` started from the terminal before opening the app.
 
 The bundle is signed ad hoc, for the Mac it was built on.
 
@@ -87,16 +87,16 @@ Finder / any application
         │  ordinary file system calls
 macOS kernel: built-in NFS client (mount_nfs, soft)
         │  NFSv3 over TCP, 127.0.0.1
-droidfs: NFS server → VFS (handles, caches) → sessions with watchdog
+macdroidfs: NFS server → VFS (handles, caches) → sessions with watchdog
         │  adb exec: (binary multiplexed protocol)
-droidfs-agent on the device: pread/pwrite/stat/rename/…
+macdroidfs-agent on the device: pread/pwrite/stat/rename/…
 ```
 
 The diagram above is for ADB. In MTP mode the bottom two layers are replaced by
 `MTP backend → libusb → Android MTP server`; everything else is shared.
 
 - **Agent.** A static Go binary (arm, arm64, x86, x86_64) is embedded in
-  `droidfs`; on first connection it is pushed to `/data/local/tmp` and started
+  `macdroidfs`; on first connection it is pushed to `/data/local/tmp` and started
   via `adb exec:`. It provides true random file access (writes at an offset,
   truncate, fsync) and exact error codes, with no parsing of shell output.
 - **Stateless protocol.** Every operation is addressed by path. File handles
@@ -120,7 +120,7 @@ The diagram above is for ADB. In MTP mode the bottom two layers are replaced by
 - A locked phone does not expose its storages: the daemon logs this and keeps
   retrying until the screen is unlocked.
 - macOS itself claims PTP interfaces with the `ptpcamerad` process. If it holds
-  the device, droidfs kills it (`killall ptpcamerad`; launchd restarts it on
+  the device, macdroidfs kills it (`killall ptpcamerad`; launchd restarts it on
   demand). Disable this with the `-keep-ptpcamerad` flag.
 
 Where MTP is worse than ADB:
@@ -173,7 +173,7 @@ End-to-end tests set up a real macOS kernel NFS mount and run the same set of
 scenarios through both transports:
 
 - ADB: the device is replaced by a locally running agent (same code, no adb);
-  in `TestDaemon` the built `droidfs` binary works through a fake adb server.
+  in `TestDaemon` the built `macdroidfs` binary works through a fake adb server.
 - MTP: the device is replaced by an emulator (`internal/mtp/mtpsim`) that
   speaks the protocol at the USB packet level.
 

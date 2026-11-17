@@ -1,5 +1,5 @@
 // Package mtpfs turns an MTP session into the path-based file system
-// backend the rest of droidfs works with (the same interface the adb agent
+// backend the rest of macdroidfs works with (the same interface the adb agent
 // provides), so that a device without USB debugging can be mounted too.
 //
 // MTP addresses objects by numeric handle and has no path lookup, so this
@@ -17,8 +17,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"droidfs/internal/mtp"
-	"droidfs/internal/proto"
+	"github.com/Foxhind/macdroidfs/internal/mtp"
+	"github.com/Foxhind/macdroidfs/internal/proto"
 )
 
 // ErrNoStorage means the device answered but offers no storage, which is

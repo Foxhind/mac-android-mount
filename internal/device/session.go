@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"droidfs/internal/proto"
+	"github.com/Foxhind/macdroidfs/internal/proto"
 )
 
 var (

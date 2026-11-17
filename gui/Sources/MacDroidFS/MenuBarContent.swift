@@ -10,7 +10,7 @@ struct MenuBarContent: View {
     var body: some View {
         switch daemon.runState {
         case .failed:
-            Text("droidfs Is Not Running")
+            Text("macdroidfs Is Not Running")
             Button("Restart") { daemon.restart() }
         case .starting, .stopped:
             Text("Starting…")
@@ -31,9 +31,9 @@ struct MenuBarContent: View {
             }
         }
         Divider()
-        Button("Open DroidFS…") {
+        Button("Open MacDroidFS…") {
             NSApp.activate()
-            openWindow(id: DroidFSApp.mainWindowID)
+            openWindow(id: MacDroidFSApp.mainWindowID)
         }
         Button("Settings…") {
             NSApp.activate()
@@ -41,7 +41,7 @@ struct MenuBarContent: View {
         }
         .keyboardShortcut(",")
         Divider()
-        Button("Quit DroidFS") { NSApp.terminate(nil) }
+        Button("Quit MacDroidFS") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
     }
 }

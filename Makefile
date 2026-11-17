@@ -12,35 +12,35 @@ agents:
 	@for a in $(ARCHS); do \
 		echo "agent linux/$$a"; \
 		CGO_ENABLED=0 GOOS=linux GOARCH=$$a GOARM=7 \
-			go build -trimpath -ldflags '$(LDFLAGS)' -o $(AGENT_DIR)/droidfs-agent-$$a ./cmd/droidfs-agent || exit 1; \
+			go build -trimpath -ldflags '$(LDFLAGS)' -o $(AGENT_DIR)/macdroidfs-agent-$$a ./cmd/macdroidfs-agent || exit 1; \
 	done
 
 # MTP mode links libusb through cgo (brew install libusb pkg-config).
 build: agents
-	go build -trimpath -ldflags '$(LDFLAGS)' -o bin/droidfs ./cmd/droidfs
+	go build -trimpath -ldflags '$(LDFLAGS)' -o bin/macdroidfs ./cmd/macdroidfs
 
 # adb-only build without cgo or libusb.
 build-nomtp: agents
-	CGO_ENABLED=0 go build -tags nomtp -trimpath -ldflags '$(LDFLAGS)' -o bin/droidfs ./cmd/droidfs
+	CGO_ENABLED=0 go build -tags nomtp -trimpath -ldflags '$(LDFLAGS)' -o bin/macdroidfs ./cmd/macdroidfs
 
-# The DroidFS app (SwiftUI) with the daemon inside: bin/DroidFS.app.
+# The MacDroidFS app (SwiftUI) with the daemon inside: bin/MacDroidFS.app.
 # Needs Xcode. The bundle is signed ad hoc, for this Mac only. The daemon is
-# renamed droidfsd inside it: APFS is case-insensitive, and "droidfs" would
-# overwrite the app's own "DroidFS" executable.
+# renamed macdroidfsd inside it: APFS is case-insensitive, and "macdroidfs" would
+# overwrite the app's own "MacDroidFS" executable.
 app: build
 	cd gui && swift build -c release
-	rm -rf bin/DroidFS.app
-	mkdir -p bin/DroidFS.app/Contents/MacOS bin/DroidFS.app/Contents/Resources
-	cp gui/Resources/Info.plist bin/DroidFS.app/Contents/
-	cp "$$(cd gui && swift build -c release --show-bin-path)/DroidFS" bin/DroidFS.app/Contents/MacOS/
-	cp bin/droidfs bin/DroidFS.app/Contents/MacOS/droidfsd
-	xcrun xcstringstool compile gui/Resources/Localizable.xcstrings --output-directory bin/DroidFS.app/Contents/Resources
-	codesign --force --sign - bin/DroidFS.app/Contents/MacOS/droidfsd
-	codesign --force --sign - bin/DroidFS.app
+	rm -rf bin/MacDroidFS.app
+	mkdir -p bin/MacDroidFS.app/Contents/MacOS bin/MacDroidFS.app/Contents/Resources
+	cp gui/Resources/Info.plist bin/MacDroidFS.app/Contents/
+	cp "$$(cd gui && swift build -c release --show-bin-path)/MacDroidFS" bin/MacDroidFS.app/Contents/MacOS/
+	cp bin/macdroidfs bin/MacDroidFS.app/Contents/MacOS/macdroidfsd
+	xcrun xcstringstool compile gui/Resources/Localizable.xcstrings --output-directory bin/MacDroidFS.app/Contents/Resources
+	codesign --force --sign - bin/MacDroidFS.app/Contents/MacOS/macdroidfsd
+	codesign --force --sign - bin/MacDroidFS.app
 
 test: agents
 	go vet ./...
 	go test ./...
 
 clean:
-	rm -rf bin gui/.build $(AGENT_DIR)/droidfs-agent-*
+	rm -rf bin gui/.build $(AGENT_DIR)/macdroidfs-agent-*

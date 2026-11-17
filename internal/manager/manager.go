@@ -23,14 +23,14 @@ import (
 	"sync"
 	"time"
 
-	"droidfs/internal/adb"
-	"droidfs/internal/device"
-	"droidfs/internal/mount"
-	"droidfs/internal/mtp"
-	"droidfs/internal/mtpfs"
-	"droidfs/internal/nfs"
-	"droidfs/internal/usb"
-	"droidfs/internal/vfs"
+	"github.com/Foxhind/macdroidfs/internal/adb"
+	"github.com/Foxhind/macdroidfs/internal/device"
+	"github.com/Foxhind/macdroidfs/internal/mount"
+	"github.com/Foxhind/macdroidfs/internal/mtp"
+	"github.com/Foxhind/macdroidfs/internal/mtpfs"
+	"github.com/Foxhind/macdroidfs/internal/nfs"
+	"github.com/Foxhind/macdroidfs/internal/usb"
+	"github.com/Foxhind/macdroidfs/internal/vfs"
 )
 
 // Config holds the daemon settings, mostly taken from command-line flags.
@@ -692,7 +692,7 @@ func Devices(ctx context.Context) ([]adb.Device, error) {
 	return adb.New().Devices(ctx)
 }
 
-// UnmountAll force-unmounts every droidfs mount, whoever created it.
+// UnmountAll force-unmounts every macdroidfs mount, whoever created it.
 func UnmountAll(l *log.Logger) error {
 	var firstErr error
 	for _, st := range mount.Ours() {

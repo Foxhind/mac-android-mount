@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"droidfs/internal/vfs"
+	"github.com/Foxhind/macdroidfs/internal/vfs"
 )
 
 const (

@@ -12,7 +12,7 @@ var files embed.FS
 
 // Get returns the agent binary for a GOARCH value (arm, arm64, 386, amd64).
 func Get(arch string) ([]byte, error) {
-	b, err := files.ReadFile("bin/droidfs-agent-" + arch)
+	b, err := files.ReadFile("bin/macdroidfs-agent-" + arch)
 	if err != nil {
 		return nil, fmt.Errorf("no embedded agent for %s (run `make agents`)", arch)
 	}

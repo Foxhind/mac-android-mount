@@ -1,13 +1,13 @@
 // swift-tools-version: 6.0
 
-// The DroidFS app: a window and a menu bar item in front of the droidfs
-// daemon. `make app` builds it and assembles bin/DroidFS.app.
+// The MacDroidFS app: a window and a menu bar item in front of the macdroidfs
+// daemon. `make app` builds it and assembles bin/MacDroidFS.app.
 import PackageDescription
 
 let package = Package(
-    name: "DroidFS",
+    name: "MacDroidFS",
     platforms: [.macOS(.v15)],
     targets: [
-        .executableTarget(name: "DroidFS", path: "Sources/DroidFS")
+        .executableTarget(name: "MacDroidFS", path: "Sources/MacDroidFS")
     ]
 )

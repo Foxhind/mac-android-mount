@@ -56,7 +56,7 @@ struct ControlClient: Sendable {
         }
         guard connected == 0 else { throw posixFailure("connect") }
 
-        let head = "\(method) \(path) HTTP/1.0\r\nHost: droidfs\r\nContent-Length: 0\r\n\r\n"
+        let head = "\(method) \(path) HTTP/1.0\r\nHost: macdroidfs\r\nContent-Length: 0\r\n\r\n"
         let sent = head.utf8CString.withUnsafeBufferPointer { buf in
             write(fd, buf.baseAddress, buf.count - 1) // without the trailing NUL
         }

@@ -2,14 +2,14 @@ import AppKit
 import SwiftUI
 
 @main
-struct DroidFSApp: App {
+struct MacDroidFSApp: App {
     @NSApplicationDelegateAdaptor private var appDelegate: AppDelegate
     @State private var settings = AppSettings.shared
 
     static let mainWindowID = "main"
 
     var body: some Scene {
-        Window("DroidFS", id: Self.mainWindowID) {
+        Window("MacDroidFS", id: Self.mainWindowID) {
             MainView()
                 .environment(appDelegate.daemon)
         }
@@ -24,7 +24,7 @@ struct DroidFSApp: App {
                 .environment(settings)
         }
 
-        MenuBarExtra("DroidFS", systemImage: "externaldrive.connected.to.line.below",
+        MenuBarExtra("MacDroidFS", systemImage: "externaldrive.connected.to.line.below",
                      isInserted: $settings.showMenuBarIcon) {
             MenuBarContent()
                 .environment(appDelegate.daemon)

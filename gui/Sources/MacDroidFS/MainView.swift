@@ -53,7 +53,7 @@ struct DevicesView: View {
         switch daemon.runState {
         case .failed(let message):
             ContentUnavailableView {
-                Label("droidfs Is Not Running", systemImage: "exclamationmark.triangle")
+                Label("macdroidfs Is Not Running", systemImage: "exclamationmark.triangle")
             } description: {
                 Text(message)
             } actions: {

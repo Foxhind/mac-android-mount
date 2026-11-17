@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"droidfs/internal/proto"
+	"github.com/Foxhind/macdroidfs/internal/proto"
 )
 
 // Backend is the device. All paths are relative to the exported root ("" is

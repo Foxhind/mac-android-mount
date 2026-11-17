@@ -5,15 +5,15 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>DroidFS</string>
+	<string>MacDroidFS</string>
 	<key>CFBundleExecutable</key>
-	<string>DroidFS</string>
+	<string>MacDroidFS</string>
 	<key>CFBundleIdentifier</key>
-	<string>io.github.foxhind.DroidFS</string>
+	<string>io.github.foxhind.MacDroidFS</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>DroidFS</string>
+	<string>MacDroidFS</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

@@ -210,7 +210,7 @@ func (d *dec) u32s() []uint32 {
 
 // --------------------------------------------------------------- datasets
 
-// DeviceInfo is the part of the MTP DeviceInfo dataset that droidfs uses.
+// DeviceInfo is the part of the MTP DeviceInfo dataset that macdroidfs uses.
 type DeviceInfo struct {
 	VendorExtension string
 	Operations      []uint16
@@ -251,7 +251,7 @@ func parseDeviceInfo(b []byte) (DeviceInfo, error) {
 	return di, d.err
 }
 
-// StorageInfo is the part of the MTP StorageInfo dataset that droidfs uses.
+// StorageInfo is the part of the MTP StorageInfo dataset that macdroidfs uses.
 type StorageInfo struct {
 	ID          uint32
 	Access      uint16 // 0 = read-write
@@ -275,7 +275,7 @@ func parseStorageInfo(b []byte) (StorageInfo, error) {
 	return si, d.err
 }
 
-// ObjectInfo is the part of the MTP ObjectInfo dataset that droidfs uses.
+// ObjectInfo is the part of the MTP ObjectInfo dataset that macdroidfs uses.
 type ObjectInfo struct {
 	Storage  uint32
 	Format   uint16

@@ -17,7 +17,7 @@ import (
 	"time"
 	"unicode/utf16"
 
-	"droidfs/internal/mtp"
+	"github.com/Foxhind/macdroidfs/internal/mtp"
 )
 
 const packet = 512

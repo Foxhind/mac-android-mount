@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import Observation
 
-/// Runs the bundled droidfs daemon as a child process, collects its log and
+/// Runs the bundled macdroidfs daemon as a child process, collects its log and
 /// keeps the device list current through the control socket.
 @MainActor
 @Observable
@@ -36,15 +36,15 @@ final class DaemonController {
         // The per-user temporary directory is private (mode 0700) and short
         // enough for a socket path.
         let socket = FileManager.default.temporaryDirectory
-            .appendingPathComponent("droidfs-control.sock").path
+            .appendingPathComponent("macdroidfs-control.sock").path
         client = ControlClient(socketPath: socket)
     }
 
     /// Starts the daemon if it is not running.
     func start() {
         guard process == nil else { return }
-        guard let binary = Bundle.main.url(forAuxiliaryExecutable: "droidfsd") else {
-            runState = .failed(String(localized: "The droidfsd daemon is missing from the app bundle."))
+        guard let binary = Bundle.main.url(forAuxiliaryExecutable: "macdroidfsd") else {
+            runState = .failed(String(localized: "The macdroidfsd daemon is missing from the app bundle."))
             return
         }
         let proc = Process()
@@ -184,8 +184,8 @@ final class DaemonController {
             process = nil
             lifeline = nil
             runState = .failed(signaled
-                ? String(localized: "droidfs was killed by signal \(status). See the log for details.")
-                : String(localized: "droidfs exited with status \(status). See the log for details."))
+                ? String(localized: "macdroidfs was killed by signal \(status). See the log for details.")
+                : String(localized: "macdroidfs exited with status \(status). See the log for details."))
         }
     }
 }

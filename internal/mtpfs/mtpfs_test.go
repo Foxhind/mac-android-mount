@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"droidfs/internal/mtp"
-	"droidfs/internal/mtp/mtpsim"
-	"droidfs/internal/proto"
+	"github.com/Foxhind/macdroidfs/internal/mtp"
+	"github.com/Foxhind/macdroidfs/internal/mtp/mtpsim"
+	"github.com/Foxhind/macdroidfs/internal/proto"
 )
 
 func newBackend(t *testing.T, sim *mtpsim.Device) *Backend {

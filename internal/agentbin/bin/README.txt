@@ -1,1 +1,1 @@
-Device agent binaries (droidfs-agent-<arch>) are generated here by `make agents`.
+Device agent binaries (macdroidfs-agent-<arch>) are generated here by `make agents`.

@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	"droidfs/internal/control"
-	"droidfs/internal/mount"
+	"github.com/Foxhind/macdroidfs/internal/control"
+	"github.com/Foxhind/macdroidfs/internal/mount"
 )
 
 // fakeADB imitates the adb server well enough for the daemon: it announces
@@ -120,7 +120,7 @@ func (f *fakeADB) handle(c net.Conn) {
 		switch {
 		case svc == "exec:getprop ro.product.cpu.abi":
 			io.WriteString(c, "OKAYarm64-v8a\n")
-		case strings.HasPrefix(svc, "exec:/data/local/tmp/droidfs-agent-"):
+		case strings.HasPrefix(svc, "exec:/data/local/tmp/macdroidfs-agent-"):
 			io.WriteString(c, "OKAY")
 			// Hand the socket itself to the agent, so that no goroutine
 			// of this (file-system-using) process sits in the data path.
@@ -153,18 +153,18 @@ func waitFor(t *testing.T, d time.Duration, what string, cond func() bool) {
 	t.Fatalf("%s: not within %s", what, d)
 }
 
-// TestDaemon drives the real droidfs binary through a device's whole life:
+// TestDaemon drives the real macdroidfs binary through a device's whole life:
 // plug, use, unplug, quick return, long absence, return, daemon crash.
 func TestDaemon(t *testing.T) {
-	tmp, err := os.MkdirTemp("", "droidfs-daemon-")
+	tmp, err := os.MkdirTemp("", "macdroidfs-daemon-")
 	if err != nil {
 		t.Fatal(err)
 	}
 	tmp, _ = filepath.EvalSymlinks(tmp)
-	bin, agent := filepath.Join(tmp, "droidfs"), filepath.Join(tmp, "agent")
+	bin, agent := filepath.Join(tmp, "macdroidfs"), filepath.Join(tmp, "agent")
 	dev, dir := filepath.Join(tmp, "device"), filepath.Join(tmp, "mounts")
 	os.Mkdir(dev, 0o755)
-	for out, pkg := range map[string]string{bin: "droidfs/cmd/droidfs", agent: "droidfs/cmd/droidfs-agent"} {
+	for out, pkg := range map[string]string{bin: "github.com/Foxhind/macdroidfs/cmd/macdroidfs", agent: "github.com/Foxhind/macdroidfs/cmd/macdroidfs-agent"} {
 		if b, err := exec.Command("go", "build", "-o", out, pkg).CombinedOutput(); err != nil {
 			t.Fatalf("build %s: %v\n%s", pkg, err, b)
 		}
@@ -186,7 +186,7 @@ func TestDaemon(t *testing.T) {
 		},
 	}}
 	state := func() string {
-		resp, err := ctl.Get("http://droidfs/v1/devices")
+		resp, err := ctl.Get("http://macdroidfs/v1/devices")
 		if err != nil {
 			return "unreachable: " + err.Error()
 		}
@@ -199,7 +199,7 @@ func TestDaemon(t *testing.T) {
 	}
 	post := func(cmd string) {
 		t.Helper()
-		resp, err := ctl.Post("http://droidfs/v1/devices/adb:"+fakeSerial+"/"+cmd, "", nil)
+		resp, err := ctl.Post("http://macdroidfs/v1/devices/adb:"+fakeSerial+"/"+cmd, "", nil)
 		if err != nil {
 			t.Fatal(err)
 		}

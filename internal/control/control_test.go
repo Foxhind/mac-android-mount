@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"droidfs/internal/manager"
+	"github.com/Foxhind/macdroidfs/internal/manager"
 )
 
 type fakeDaemon struct {
@@ -38,7 +38,7 @@ func (f *fakeDaemon) do(cmd, id string) error {
 func TestHandler_Devices(t *testing.T) {
 	d := &fakeDaemon{devices: []manager.DeviceStatus{{
 		ID: "adb:X1", Transport: "adb", Model: "Pixel 8", Serial: "X1",
-		Point: "/Users/u/DroidFS/Pixel 8", State: manager.StateMounted,
+		Point: "/Users/u/MacDroidFS/Pixel 8", State: manager.StateMounted,
 	}}}
 	rec := httptest.NewRecorder()
 	Handler(d).ServeHTTP(rec, httptest.NewRequest("GET", "/v1/devices", nil))
@@ -50,7 +50,7 @@ func TestHandler_Devices(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := Device{ID: "adb:X1", Transport: "adb", Model: "Pixel 8", Serial: "X1",
-		Point: "/Users/u/DroidFS/Pixel 8", State: "mounted"}
+		Point: "/Users/u/MacDroidFS/Pixel 8", State: "mounted"}
 	if len(got) != 1 || got[0] != want {
 		t.Fatalf("got %+v, want [%+v]", got, want)
 	}
@@ -97,7 +97,7 @@ func TestHandler_Commands(t *testing.T) {
 
 func TestServe_SocketLifecycle(t *testing.T) {
 	// Socket paths are limited to ~104 bytes; t.TempDir can be longer.
-	dir, err := os.MkdirTemp("/tmp", "droidfs-ctl-")
+	dir, err := os.MkdirTemp("/tmp", "macdroidfs-ctl-")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestServe_SocketLifecycle(t *testing.T) {
 			return d.DialContext(ctx, "unix", path)
 		},
 	}}
-	resp, err := client.Get("http://droidfs/v1/devices")
+	resp, err := client.Get("http://macdroidfs/v1/devices")
 	if err != nil {
 		t.Fatal(err)
 	}

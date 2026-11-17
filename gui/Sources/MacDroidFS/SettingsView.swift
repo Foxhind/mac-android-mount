@@ -12,7 +12,7 @@ struct SettingsView: View {
                 Toggle("Launch at login", isOn: $settings.launchAtLogin)
                 if settings.launchAtLoginStatus == .requiresApproval {
                     HStack {
-                        Text("Allow DroidFS in System Settings to finish turning this on.")
+                        Text("Allow MacDroidFS in System Settings to finish turning this on.")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                         Button("Open Login Items") { SMAppService.openSystemSettingsLoginItems() }

@@ -17,7 +17,7 @@ import (
 )
 
 // SourcePrefix marks our mounts in the mount table.
-const SourcePrefix = "127.0.0.1:/droidfs/"
+const SourcePrefix = "127.0.0.1:/macdroidfs/"
 
 // Info is one entry of the system mount table.
 type Info struct {
@@ -82,7 +82,7 @@ func IsMounted(point string) bool {
 	return false
 }
 
-// Options describe how Mount attaches a droidfs NFS server.
+// Options describe how Mount attaches a macdroidfs NFS server.
 type Options struct {
 	Port     int
 	Name     string // appears in the mount source
